@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.2.2 (14) — slightly faster animated reveal, 2026-10-01
+
+- Shortened the normal wheel reveal from 120 ms to 105 ms. It remains a visible smooth fade-and-expand while feeling more immediate; Less animation remains instant.
+- Updated the verified app, documentation, source archive, app archive, and checksums.
+
+## 1.2.1 (13) — smoother wheel reveal, 2026-10-01
+
+- Default Launcher and Quitter appearance now fades and expands from 95% size over 120 ms, replacing the nearly instant 32 ms reveal. Closing uses a brief 40 ms fade.
+- A separate presentation state establishes the collapsed frame before opening, including reused panels. Input and release-to-select remain available immediately; no animation wait is imposed on selection.
+- Less animation and macOS Reduce Motion bypass the staged reveal. Generation guards cancel old reveals/hides during rapid changes, and release before reveal cancels without a flash.
+- Updated the app to 1.2.1 (13), local installation, source/app packages, and checksums. Existing 1.2.0 release archives remain available locally; publishing 1.2.1 on GitHub is a separate action.
+
 ## 1.2.0 (12) — Halo public-source preparation, 2026-09-30
 
 - Official app, executable, source folder, and installation are now Halo. The former hybrid project is preserved as Halo Legacy; approved baseline archives are untouched. The internal bundle identifier stays unchanged for preferences/permission continuity.

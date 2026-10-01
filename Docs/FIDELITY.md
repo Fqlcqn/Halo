@@ -4,6 +4,8 @@ Reference: Halo 0.2.1 (6), copied from the former hybrid project's `Latest/Halo.
 
 ## Measured/recovered constants
 
+Version 1.2.2 uses a visibly animated 105 ms ease-out reveal with 95% starting scale and 40 ms collapse. A separate presentation state prevents reset/reveal coalescing while immediate interaction, interruption guards, Less animation, and Reduce Motion remain supported. These values supersede the historical visibility timings below.
+
 Version 1.1.2 extends the 1.1.1 continuous annular renderer with 21 light, liquid-biased glass levels and a 36–78 pt ring-thickness scale. Oppositely wound ellipses preserve both lens boundaries and the clear center without repeated circle joins. More diffusion is achieved with lighter native regular material rather than a dark overlay. The original cropped disc, the 96-circle intermediate renderer, and the 5-point inset veil below are historical, not current. Optical sampling remains system-controlled; no fixed-resolution or exact iOS compositor claim is made. Both Settings previews share production geometry and allow a draggable wheel-mode switch.
 
 The table below records the reconstruction baseline. Requested changes in 1.0.1 supersede its timings: no reveal scheduling delay, 45 ms reveal, 25 ms collapse, 40 ms subset-release guard, and a 0.16/0.86 icon selection spring. Settings now uses native window behavior. Both handoff directions commit selection. Outer selection is unlimited by default, optionally bounded; dynamic 0–8 pt icon movement is optional. These deliberate changes are recorded in CHANGELOG.md.

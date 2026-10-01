@@ -1,6 +1,11 @@
 import AppKit
 import SwiftUI
 
+enum WheelPresentation {
+    static let revealDuration = 0.105
+    static let hideDuration = 0.04
+}
+
 final class WheelPanel: NSPanel {
     var handleKey: ((NSEvent) -> Bool)?
     override var canBecomeKey: Bool { true }
@@ -29,9 +34,11 @@ final class WheelPanel: NSPanel {
         canCommit = true
         lastMouse = nil
         var reset = Transaction(); reset.disablesAnimations = true
+        let immediate = instant || NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
         withTransaction(reset) {
             state.instantTransitions = instant
             state.revealed = false; state.selected = nil
+            state.presentationReady = immediate
             state.selectionHasOrigin = false
             state.selectionAngle = geometry.startAngle
             state.geometry = geometry; state.items = items
@@ -62,11 +69,15 @@ final class WheelPanel: NSPanel {
         if trackMouse { panel?.makeKey() }
         // Make the wheel interactive immediately. The first hover should not
         // wait for a deferred SwiftUI state update or the first timer tick.
-        if instant { withTransaction(reset) { state.revealed = true } }
-        else { state.revealed = true }
+        withTransaction(reset) { state.revealed = true }
+        // Render the collapsed state before advancing appearance. Otherwise
+        // SwiftUI can coalesce reset/reveal and skip the animation on reuse.
+        panel?.contentView?.needsLayout = true
+        panel?.contentView?.layoutSubtreeIfNeeded()
         if trackMouse { updateSelection() }
         DispatchQueue.main.async { [weak self] in
             guard let self, self.generation == ticket else { return }
+            if !immediate && self.state.revealed { self.state.presentationReady = true }
             // Pick up a pointer move that occurred between orderFront and the
             // first timer tick without changing the animation timing.
             if trackMouse { self.updateSelection() }
@@ -126,13 +137,13 @@ final class WheelPanel: NSPanel {
         let ticket = generation
         canCommit = false
         tracking?.invalidate(); tracking = nil
-        if immediately || state.instantTransitions {
+        if immediately || state.instantTransitions || !state.presentationReady || NSWorkspace.shared.accessibilityDisplayShouldReduceMotion {
             var transaction = Transaction(); transaction.disablesAnimations = true
             withTransaction(transaction) { state.revealed = false; state.selected = nil }
             panel?.orderOut(nil); return
         }
         state.revealed = false
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.016) { [weak self] in
+        DispatchQueue.main.asyncAfter(deadline: .now() + WheelPresentation.hideDuration) { [weak self] in
             guard let self, self.generation == ticket else { return }
             self.panel?.orderOut(nil); self.state.selected = nil
         }

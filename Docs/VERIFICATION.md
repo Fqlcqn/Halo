@@ -1,5 +1,18 @@
 # Verification record
 
+## October 1, 2026 — 1.2.2 (14)
+
+- Normal wheel reveal is now 105 ms instead of 120 ms; it remains visibly animated and input-ready immediately. Less animation remains instant.
+- This patch is verified through the full build/install/package/status workflow below; the updated `/Applications/Halo.app` is the 1.2.2 (14) build.
+
+## October 1, 2026 — 1.2.1 (13)
+
+- `make verify` passed: 18,548 geometry/preferences checks, 3,965 native window/lifecycle checks, shortcut/runtime suites, and harmless Trash simulations. No live force-quit, Finder close, or Trash actions were run.
+- Visibility checks cover instant-mode presentation bypass, collapsed animated presentation with immediate input availability, selected-item commit before reveal completion, cancelled reveals, stale-hide cancellation, panel reuse, and 100 rapid cycles. macOS Reduce Motion bypasses reveal staging.
+- Default opening is now a 120 ms ease-out fade/95%-to-100% expansion; closing is 40 ms. Separate presentation and interaction states prevent show/reset coalescing without adding a fixed input delay.
+- Both supplied October 1 recordings failed AVFoundation frame decoding with error -11832/-12431; no frame-by-frame visual match is claimed. Tuning uses the measured existing 32 ms timing, the documented earlier 95% scale, and the requested visible-but-fast reveal. Perceived feel remains a user acceptance check.
+- Installed and packaged artifacts are verified through `make install`, `make package`, and `make status`. Private recording derivatives and logs remain under ignored Build/. GitHub publication is separate from the local update.
+
 ## September 30, 2026 — 1.2.0 (12)
 
 - Passed 18,548 geometry/preferences/scroll/pending-quit checks and 3,863 native window/lifecycle checks, plus shortcut/runtime suites and harmless Trash simulations. Native tests exercise both instant and animated cycles, comma-key routing, live list identity preservation, and safe removal of the selected item.
