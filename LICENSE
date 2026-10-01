@@ -1,0 +1,43 @@
+Halo Source-Available License 1.0
+Copyright (c) 2026 Maneesh Getni
+
+1. Permission
+You may download, run, study, and privately modify Halo, including building it
+for personal or internal use. You may share unmodified official releases and
+unmodified source with this license, author credit, copyright notice, and a
+link to the original Halo repository intact. These uses require no fee.
+
+2. Attribution and identity
+Keep the copyright and "Made by Maneesh Getni" attribution. Do not claim that
+you created the original Halo or imply endorsement of your changes. This
+license grants no right to promote a separate product using Halo's name,
+icon, or branding.
+
+3. Modified distributions
+Public distribution of modified Halo source or binaries, rebranded versions,
+or products incorporating substantial portions of Halo requires prior written
+permission from Maneesh Getni. Private modifications do not require permission.
+You may submit patches to the official repository for review. Permissions
+required by the hosting platform's terms for viewing and forking a public
+repository are not restricted; this does not authorize modified app releases.
+
+4. Contributions and third-party material
+Contributors retain ownership of their original contributions. Contributions
+intentionally submitted for inclusion are licensed under these terms unless
+separately agreed in writing. Third-party components and application icons
+remain subject to their owners' rights. This license covers only rights the
+Halo copyright holders can grant.
+
+5. Other rights
+All rights not expressly granted are reserved. This is a source-available
+license, not an OSI-approved open-source license. Nothing here restricts rights
+granted independently by applicable law. Contact Maneesh Getni through the
+official repository owner's profile to request broader distribution rights.
+
+6. Disclaimer
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, AND
+NONINFRINGEMENT. TO THE MAXIMUM EXTENT PERMITTED BY LAW, AUTHORS AND COPYRIGHT
+HOLDERS ARE NOT LIABLE FOR CLAIMS, DAMAGES, OR OTHER LIABILITY ARISING FROM
+USE OF THE SOFTWARE. Force quitting and emptying Trash can cause data loss;
+users are responsible for the actions they select.

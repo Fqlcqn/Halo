@@ -1,0 +1,14 @@
+Build/
+Backups/
+Deployments/
+Reference/
+Dist/
+.env
+.env.*
+*.p12
+*.p8
+*.mobileprovision
+*.xcuserstate
+xcuserdata/
+.DS_Store
+__pycache__/
