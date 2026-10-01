@@ -1,5 +1,7 @@
 # Halo
 
+Hold. Point. Release.
+
 A customizable Liquid Glass app launcher and quitter for macOS.
 Made by **Maneesh Getni**.
 
