@@ -20,6 +20,9 @@ struct WheelItem: Identifiable {
     @Published var selectionAngle = -Double.pi / 2
     @Published var selectionHasOrigin = false
     @Published var revealed = false
+    // Interaction starts immediately; presentation waits for the collapsed
+    // hosting-view state to be laid out before beginning its reveal.
+    @Published var presentationReady = true
     @Published var instantTransitions = false
     @Published var geometry = WheelGeometry()
     @Published var highlightsTrash = true
@@ -139,6 +142,7 @@ struct WheelView: View {
     var showsIcons = true
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     var body: some View {
+        let visible = state.revealed && state.presentationReady
         let geometry = state.geometry
         let span = 2 * Double.pi / Double(max(1, state.items.count))
         ZStack {
@@ -153,9 +157,9 @@ struct WheelView: View {
         .frame(width: geometry.diameter + 28, height: geometry.diameter + 28)
         .padding(14)
         .background(.clear)
-        .scaleEffect(state.revealed || reduceMotion ? 1 : 0.97)
-        .opacity(state.revealed ? 1 : 0)
-        .animation(reduceMotion ? nil : .easeOut(duration: state.revealed ? 0.032 : 0.016), value: state.revealed)
+        .scaleEffect(visible || reduceMotion ? 1 : 0.95)
+        .opacity(visible ? 1 : 0)
+        .animation(reduceMotion ? nil : .easeOut(duration: visible ? WheelPresentation.revealDuration : WheelPresentation.hideDuration), value: visible)
         .transaction { transaction in
             if state.instantTransitions || reduceMotion { transaction.animation = nil; transaction.disablesAnimations = true }
         }

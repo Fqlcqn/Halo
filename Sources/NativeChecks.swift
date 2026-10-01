@@ -67,6 +67,7 @@ import SwiftUI
         for _ in 0..<100 {
             controller.show(items: items, geometry: WheelGeometry(), center: center, trackMouse: false, instant: true)
             expect(controller.state.revealed && controller.state.instantTransitions, "Less animation reveals immediately")
+            expect(controller.state.presentationReady, "Less animation bypasses presentation staging")
             controller.select(1)
             expect(controller.takeSelection() != nil && controller.takeSelection() == nil, "Instant selection commits at most once")
             controller.hide()
@@ -75,6 +76,8 @@ import SwiftUI
         controller.show(items:items,geometry:WheelGeometry(),center:center,trackMouse:false)
         expect(controller.state.revealed, "Wheel reveal is available in the same run-loop turn")
         expect(!controller.state.instantTransitions, "Ordinary show restores smooth animation")
+        expect(controller.state.presentationReady == NSWorkspace.shared.accessibilityDisplayShouldReduceMotion,
+               "Animated reveal begins with the collapsed presentation while input is ready")
         controller.select(3)
         controller.replaceItems(Array(items.dropFirst()))
         expect(controller.state.selected == 2 && controller.state.items[2].id == "fixture:3", "Live refresh preserves the selected app by identity")
@@ -92,6 +95,7 @@ import SwiftUI
         controller.show(items:items,geometry:WheelGeometry(),center:center,trackMouse:false)
         await settle()
         expect(controller.panel?.isVisible == true && controller.state.revealed, "An old hide must not close a new session")
+        expect(controller.state.presentationReady, "The current animated reveal advances after layout")
         expect(controller.panel?.frame.size == NSSize(width:356,height:356), "Exact panel geometry")
         expect(controller.panel?.hasShadow == false && controller.panel?.isOpaque == false, "Transparent, shadowless panel")
         expect(controller.panel?.level == .statusBar, "Reference overlay window level")
