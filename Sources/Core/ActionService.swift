@@ -2,7 +2,7 @@ import AppKit
 
 @MainActor final class ActionService {
     let safeMode: Bool
-    var forceQuitApps: () -> Bool = { true }
+    var forceQuitApps: (String?) -> Bool = { _ in true }
     private(set) var trashPending = false
     private var pending = PendingQuitTracker()
     var quitStateChanged: (() -> Void)?
@@ -54,7 +54,7 @@ import AppKit
         case .quit(let application):
             guard !application.isTerminated else { return }
             if !pendingQuitIDs.contains(application.processIdentifier) { prepare(item) }
-            switch QuitDisposition.resolve(bundleIdentifier: application.bundleIdentifier, force: forceQuitApps()) {
+            switch QuitDisposition.resolve(bundleIdentifier: application.bundleIdentifier, force: forceQuitApps(application.bundleIdentifier)) {
             case .closeFinderWindows:
                 Task {
                     let error = await Task.detached(priority: .utility) {

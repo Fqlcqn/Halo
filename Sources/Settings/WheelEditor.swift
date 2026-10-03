@@ -132,7 +132,7 @@ struct WheelEditor: View {
                 NSHapticFeedbackManager.defaultPerformer.perform(quitter ? .alignment : .levelChange, performanceTime: .now)
             }
             state.selectionHasOrigin = state.selected != nil
-            state.selectionAngle += WheelGeometry.shortestDelta(from: state.selectionAngle, to: g.angle(index: index, count: state.items.count))
+            state.selectionAngle += WheelGeometry.selectionDelta(from: state.selectionAngle, to: g.angle(index: index, count: state.items.count), pointer: atan2(-dy, dx))
         }
         state.selected = index
     }

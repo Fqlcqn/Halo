@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.2.3 (15) — two-item rotation and per-app quitting, 2026-10-03
+
+- Opposite highlight sectors follow the pointer's side of travel, allowing full clockwise and counterclockwise rotations with one app plus Trash. The same geometry is used in previews.
+- Apps → Quitter now offers per-app Use default, Quit, and Force quit choices for running apps or a chosen .app. Rules persist immediately by bundle identifier, survive export/import, and apply across app restarts. Existing settings retain the Advanced global default; Finder always closes windows.
+- Updated local app and source packages. Automated checks do not exercise real force quit or Empty Trash; physical interaction remains a manual acceptance check.
+
 ## 1.2.2 (14) — slightly faster animated reveal, 2026-10-01
 
 - Shortened the normal wheel reveal from 120 ms to 105 ms. It remains a visible smooth fade-and-expand while feeling more immediate; Less animation remains instant.

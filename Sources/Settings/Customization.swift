@@ -8,6 +8,7 @@ struct CustomizationPage: View {
     @State private var draft: HaloPreferences
     @State private var message = ""
     @State private var quitter = false
+    @State private var quitAppID = ""
     @State private var backdrop = PreviewBackdrop.Style.color
     init(tab: Int, store: PreferenceStore) {
         self.tab = tab; self.store = store
@@ -107,20 +108,43 @@ struct CustomizationPage: View {
                     WheelEditor(preferences: preferencesBinding, quitter: quitter, editable: true)
                         .frame(height: 340)
                     if quitter {
+                        HStack(alignment: .top, spacing: 16) {
+                        section("Per-app quit behavior") {
+                            HStack {
+                                Menu(quitAppID.isEmpty ? "Choose app…" : quitAppName(quitAppID)) {
+                                    ForEach(quitAppIDs, id: \.self) { id in
+                                        Button(quitAppName(id)) { quitAppID = id }
+                                    }
+                                    Divider()
+                                    Button("Choose another app…", action: chooseQuitApp)
+                                }.frame(maxWidth: .infinity, alignment: .leading)
+                                Picker("Quit behavior", selection: Binding(
+                                    get: { preferences.appQuitOverrides[quitAppID].map { $0 ? 2 : 1 } ?? 0 },
+                                    set: { preferences.appQuitOverrides[quitAppID] = $0 == 0 ? nil : $0 == 2 })) {
+                                    Text("Use default").tag(0)
+                                    Text("Quit").tag(1)
+                                    Text("Force quit").tag(2)
+                                }.labelsHidden().frame(width: 170)
+                                    .disabled(quitAppID.isEmpty || quitAppID == "com.apple.finder")
+                            }
+                            Text(quitAppID == "com.apple.finder" ? "Finder always closes its windows." : "Default: \(preferences.forceQuitApps ? "Force quit" : "Quit") · Force quit can lose unsaved changes.")
+                                .font(.caption).foregroundStyle(.secondary)
+                        }
                         section("Pinned Trash") {
-                            HStack(alignment: .top, spacing: 24) {
+                            HStack(alignment: .top, spacing: 12) {
                                 VStack(spacing: 8) {
                                     Toggle("Show Trash", isOn: binding(\.showsTrash))
                                     Toggle("Highlight sector", isOn: binding(\.highlightsTrash)).disabled(!preferences.showsTrash)
-                                }.frame(width: 250)
+                                }.frame(width: 210)
                                 VStack(alignment: .leading, spacing: 8) {
                                     Text("Position").font(.caption).foregroundStyle(.secondary)
                                     Picker("Position", selection: binding(\.trashPosition)) {
                                         ForEach(TrashPosition.allCases, id: \.self) { Text($0.rawValue.capitalized).tag($0) }
                                     }.labelsHidden().disabled(!preferences.showsTrash)
-                                }.frame(width: 160)
+                                }.frame(width: 100)
                                 Spacer(minLength: 0)
                             }
+                        }
                         }
                         Text("Running apps arrange automatically. This preview never quits apps or empties Trash.")
                             .font(.caption).foregroundStyle(.secondary)
@@ -159,6 +183,25 @@ struct CustomizationPage: View {
     }
     private func tintBinding(_ key: WritableKeyPath<HaloPreferences, HaloTint>) -> Binding<Color> {
         Binding(get: { preferences[keyPath: key].color }, set: { preferences[keyPath: key] = HaloTint($0) })
+    }
+    private var quitAppIDs: [String] {
+        let running = NSWorkspace.shared.runningApplications.filter { $0.activationPolicy == .regular }.compactMap(\.bundleIdentifier)
+        return Set(running + Array(preferences.appQuitOverrides.keys) + (quitAppID.isEmpty ? [] : [quitAppID]))
+            .sorted { quitAppName($0).localizedStandardCompare(quitAppName($1)) == .orderedAscending }
+    }
+    private func quitAppName(_ id: String) -> String {
+        if let app = NSWorkspace.shared.runningApplications.first(where: { $0.bundleIdentifier == id }), let name = app.localizedName { return name }
+        return NSWorkspace.shared.urlForApplication(withBundleIdentifier: id)?.deletingPathExtension().lastPathComponent ?? id
+    }
+    private func chooseQuitApp() {
+        let panel = NSOpenPanel()
+        panel.allowedContentTypes = [.applicationBundle]
+        panel.directoryURL = URL(fileURLWithPath: "/Applications")
+        panel.prompt = "Choose"
+        guard panel.runModal() == .OK, let url = panel.url,
+              let bundle = Bundle(url: url), bundle.executableURL != nil,
+              let id = bundle.bundleIdentifier else { return }
+        quitAppID = id
     }
     private func confirmReset(_ title: String) -> Bool {
         let alert = NSAlert()

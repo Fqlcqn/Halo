@@ -111,6 +111,14 @@ struct WheelGeometry: Equatable {
         }
     }
 
+    /// Opposite sectors have two equally short paths. Follow the side crossed
+    /// by the pointer so a two-item wheel can rotate in either direction.
+    static func selectionDelta(from: Double, to: Double, pointer: Double?) -> Double {
+        let delta = shortestDelta(from: from, to: to)
+        guard abs(abs(delta) - .pi) < 0.000001, let pointer else { return delta }
+        return shortestDelta(from: from, to: pointer) < 0 ? -.pi : .pi
+    }
+
     static func shortestDelta(from: Double, to: Double) -> Double {
         var delta = (to - from).truncatingRemainder(dividingBy: 2 * .pi)
         if delta > .pi { delta -= 2 * .pi }
@@ -187,6 +195,10 @@ struct HaloPreferences: Codable, Equatable {
     var settingsTint = HaloTint.white
     var selectionTint = HaloTint.white
     var forceQuitApps = true
+    var appQuitOverrides: [String: Bool] = [:]
+    func shouldForceQuit(_ bundleIdentifier: String?) -> Bool {
+        bundleIdentifier.flatMap { appQuitOverrides[$0] } ?? forceQuitApps
+    }
     var glassFinish: WheelGlassFinish = .standard
     var glassAmount: Double? = nil
     var wheelThickness = 66.0
@@ -215,7 +227,7 @@ struct HaloPreferences: Codable, Equatable {
 
     init() {}
     enum CodingKeys: String, CodingKey {
-        case lessAnimation, previewHaptics
+        case lessAnimation, previewHaptics, appQuitOverrides
         case glassFinish, glassAmount, wheelThickness, settingsTint, selectionTint, forceQuitApps
         case version, launcherDiameter, quitterDiameter, selectionDistance, maximumSelectionDistance
         case dynamicIconMovement, launcherTargets, haptics, showSettingsOnLaunch
@@ -228,6 +240,7 @@ struct HaloPreferences: Codable, Equatable {
         settingsTint = try c.decodeIfPresent(HaloTint.self, forKey: .settingsTint) ?? .white
         selectionTint = try c.decodeIfPresent(HaloTint.self, forKey: .selectionTint) ?? .white
         forceQuitApps = try c.decodeIfPresent(Bool.self, forKey: .forceQuitApps) ?? true
+        appQuitOverrides = try c.decodeIfPresent([String: Bool].self, forKey: .appQuitOverrides) ?? [:]
         glassFinish = try c.decodeIfPresent(WheelGlassFinish.self, forKey: .glassFinish) ?? .standard
         glassAmount = try c.decodeIfPresent(Double.self, forKey: .glassAmount)
         wheelThickness = try c.decodeIfPresent(Double.self, forKey: .wheelThickness) ?? 66
@@ -246,7 +259,9 @@ struct HaloPreferences: Codable, Equatable {
     }
 
     var isValid: Bool {
-        version == 1 && settingsTint.isValid && selectionTint.isValid &&
+        version == 1 && appQuitOverrides.count <= 512 &&
+        appQuitOverrides.keys.allSatisfy { !$0.isEmpty && $0.count <= 255 } &&
+        settingsTint.isValid && selectionTint.isValid &&
         wheelThickness.isFinite && (36...78).contains(wheelThickness) &&
         (glassAmount.map { $0.isFinite && (0...1).contains($0) } ?? true) &&
         launcherDiameter.isFinite && quitterDiameter.isFinite &&

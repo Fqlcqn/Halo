@@ -99,15 +99,15 @@ final class WheelPanel: NSPanel {
         let index = state.geometry.selectedIndex(dx: dx, dy: dy, count: state.items.count)
         let lift = state.geometry.iconLift(distance: hypot(dx, dy), dynamic: dynamicIconMovement)
         if abs(state.motion.lift - lift) > 0.001 { state.motion.lift = lift }
-        select(index)
+        select(index, pointerAngle: atan2(-dy, dx))
     }
 
-    func select(_ index: Int?) {
+    func select(_ index: Int?, pointerAngle: Double? = nil) {
         guard index != state.selected else { return }
         if let index, state.items.indices.contains(index) {
             let target = state.geometry.angle(index: index, count: state.items.count)
             state.selectionHasOrigin = state.selected != nil
-            state.selectionAngle += WheelGeometry.shortestDelta(from: state.selectionAngle, to: target)
+            state.selectionAngle += WheelGeometry.selectionDelta(from: state.selectionAngle, to: target, pointer: pointerAngle)
             if haptics && !safeMode {
                 NSHapticFeedbackManager.defaultPerformer.perform(state.geometry.startAngle > 0 ? .alignment : .levelChange, performanceTime: .default)
             }
@@ -188,7 +188,7 @@ final class WheelPanel: NSPanel {
     }
     init(store: PreferenceStore, safeMode: Bool) {
         self.store = store; self.actions = ActionService(safeMode: safeMode)
-        self.actions.forceQuitApps = { [weak store] in store?.value.forceQuitApps ?? true }
+        self.actions.forceQuitApps = { [weak store] id in store?.value.shouldForceQuit(id) ?? true }
         super.init()
         launcher.safeMode = safeMode; quitter.safeMode = safeMode
         actions.quitStateChanged = { [weak self] in self?.refreshQuitter() }

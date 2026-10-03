@@ -5,6 +5,25 @@ import Foundation
         var checks = 0
         func expect(_ condition: Bool, _ message: String) { precondition(condition, message); checks += 1 }
         let g = WheelGeometry()
+        for direction in [-1.0, 1.0] {
+            var angle = Double.pi / 2
+            for _ in 0..<8 {
+                let next = angle + direction * .pi
+                let delta = WheelGeometry.selectionDelta(from: angle, to: next, pointer: angle + direction * (.pi / 2 + 0.01))
+                expect(abs(delta - direction * .pi) < 0.000001, "Opposite sectors follow pointer clockwise and counterclockwise through repeated full turns")
+                angle += delta
+            }
+        }
+        var perApp = HaloPreferences()
+        perApp.appQuitOverrides = ["example.editor": false, "example.game": true]
+        for global in [false, true] {
+            perApp.forceQuitApps = global
+            expect(!perApp.shouldForceQuit("example.editor") && perApp.shouldForceQuit("example.game"), "Per-app modes override either global default")
+            expect(perApp.shouldForceQuit(nil) == global && perApp.shouldForceQuit("unknown") == global, "Unconfigured apps inherit default")
+        }
+        expect(try! JSONDecoder().decode(HaloPreferences.self, from: JSONEncoder().encode(perApp)) == perApp, "Per-app rules survive export and relaunch")
+        perApp.appQuitOverrides.removeValue(forKey: "example.editor")
+        expect(perApp.shouldForceQuit("example.editor"), "Use default removes override")
         for reach in [nil, 100.0, 1200.0] as [Double?] {
             let preview = WheelGeometry(maximumSelectionDistance: reach)
             let size = preview.panelSize
@@ -197,8 +216,11 @@ import Foundation
         legacy.removeValue(forKey: "maximumSelectionDistance"); legacy.removeValue(forKey: "dynamicIconMovement")
         legacy.removeValue(forKey: "glassFinish")
         legacy.removeValue(forKey: "lessAnimation"); legacy.removeValue(forKey: "previewHaptics")
+        legacy.removeValue(forKey: "appQuitOverrides")
         defaults.set(try! JSONSerialization.data(withJSONObject: legacy), forKey: PreferenceStore.key)
         expect(PreferenceStore(defaults: defaults).value == preferences, "Old settings migrate without losing customization")
+        preferences.appQuitOverrides = ["example.editor": false, "example.game": true]
+        expect(store.save(preferences) && PreferenceStore(defaults: defaults).value == preferences, "Per-app rules persist immediately to a fresh store")
         preferences.lessAnimation = true; preferences.previewHaptics = true; preferences.haptics = false
         expect(store.save(preferences) && PreferenceStore(defaults: defaults).value == preferences, "Animation and independent preview feedback survive relaunch")
         preferences.maximumSelectionDistance = 320; preferences.dynamicIconMovement = true

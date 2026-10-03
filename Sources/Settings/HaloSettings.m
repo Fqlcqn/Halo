@@ -133,7 +133,7 @@ static NSView *glass(NSRect frame, __unused CGFloat radius, NSView *parent) {
 - (void)windowDidResignKey:(__unused NSNotification *)note { if (_recording>=0) [self stopRecording]; }
 - (void)selectTab:(NSButton *)sender { [self stopRecording]; _tab=sender.tag; [self drawPage]; }
 - (void)drawPage {
-    [self layoutPageWithSize:_tab==1?NSMakeSize(960,740):_tab==2?NSMakeSize(800,680):_tab==3?NSMakeSize(700,570):NSMakeSize(700,500)];
+    [self layoutPageWithSize:_tab==1?NSMakeSize(960,740):_tab==2?NSMakeSize(960,740):_tab==3?NSMakeSize(700,570):NSMakeSize(700,500)];
     [self populatePage];
 }
 - (void)layoutPageWithSize:(NSSize)size {

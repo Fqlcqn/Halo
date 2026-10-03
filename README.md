@@ -11,7 +11,7 @@ shortcuts, animation, and haptics.
 
 ## Install
 
-Requires **macOS 26+**, Apple silicon or Intel. Download `Halo-1.2.2-macOS.zip`
+Requires **macOS 26+**, Apple silicon or Intel. Download `Halo-1.2.3-macOS.zip`
 from this repository's Releases, unzip, move Halo.app to Applications, and open
 it. Quit older Halo copies first. There is no account, subscription, telemetry,
 or automatic updater.
@@ -40,7 +40,10 @@ menu-bar icon always provides access, even without shortcut permissions.
 
 Quitter shows running apps. **Force quit is initially enabled to preserve
 existing behavior and can discard unsaved work.** Turn it off in Advanced for
-normal quit requests. Finder closes its windows instead of terminating.
+normal quit requests. Apps → Quitter lets you choose an app and override that
+default with Quit or Force quit; Use default removes the override. Rules follow
+the app's bundle identifier, including other installed copies with that identity.
+Finder closes its windows instead of terminating.
 **Empty Trash permanently deletes contents**; hide it in Apps → Quitter if
 unwanted. Finder actions may request Automation permission. Declining permission
 leaves Settings usable and affected actions report errors.

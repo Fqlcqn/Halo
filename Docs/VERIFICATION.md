@@ -1,5 +1,12 @@
 # Verification record
 
+## October 3, 2026 — 1.2.3 (15)
+
+- Geometry regression checks exercise repeated full turns in both directions through opposite sectors. Per-app quit rules cover both global defaults, unknown apps, override removal and JSON round trips. Existing Finder disposition checks retain close-windows behavior.
+- The supplied October 3 recording could not be decoded by AVFoundation (-11832/-12431). The rotation correction addresses the 180-degree ambiguity in shared selection geometry; physical pointer feel remains a manual check.
+- No real force quit or Empty Trash is used in automation. Verify per-app normal-quit/save prompts and force quit manually with disposable documents only.
+- Safe isolated UI inspection confirmed the Apps → Quitter controls fit, the app menu populates, and choosing Quit updates the per-app picker. The diagnostic app was then closed; real user preferences were not changed.
+
 ## October 1, 2026 — 1.2.2 (14)
 
 - Normal wheel reveal is now 105 ms instead of 120 ms; it remains visibly animated and input-ready immediately. Less animation remains instant.
