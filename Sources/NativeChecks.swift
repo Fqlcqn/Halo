@@ -84,6 +84,19 @@ import SwiftUI
         controller.replaceItems(items.filter { $0.id != "fixture:3" })
         expect(controller.state.selected == nil, "Removing a selected app does not select its neighbor")
         controller.replaceItems(items)
+        let stableSlots = [
+            WheelLayoutSlot(id: "fixture:0", angle: -.pi / 2),
+            WheelLayoutSlot(id: "fixture:1", angle: 0),
+            WheelLayoutSlot(id: "fixture:2", angle: .pi / 2),
+            WheelLayoutSlot(id: "fixture:3", angle: .pi)
+        ]
+        controller.show(items: Array(items.prefix(4)), geometry: WheelGeometry(), layoutSlots: stableSlots, center: center, trackMouse: false, instant: true)
+        expect(controller.state.selectedIndex(dx: cos(.pi) * 120, dy: -sin(.pi) * 120) == 3, "Fixed session slots select their assigned app direction")
+        controller.replaceItems([items[0], items[2], items[3]])
+        expect(controller.state.layoutSlots == stableSlots, "Live removal retains every Quitter session slot")
+        expect(controller.state.selectedIndex(dx: 120, dy: 0) == nil, "An exited app leaves an inert empty direction")
+        expect(controller.state.selectedIndex(dx: cos(.pi) * 120, dy: -sin(.pi) * 120) == 2, "Remaining apps do not reindex after a live removal")
+        controller.show(items: items, geometry: WheelGeometry(), center: center, trackMouse: false, instant: true)
         controller.select(1)
         expect(controller.takeSelection()?.id == "fixture:1", "Fast selections commit without waiting for reveal animation")
         controller.hide()

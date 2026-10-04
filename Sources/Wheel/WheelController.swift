@@ -27,7 +27,7 @@ final class WheelPanel: NSPanel {
     var onAccessibilitySelect: ((Int) -> Void)?
     var onKeyEvent: ((NSEvent) -> Bool)?
 
-    func show(items: [WheelItem], geometry: WheelGeometry, center: CGPoint? = nil, trackMouse: Bool = true, instant: Bool = false) {
+    func show(items: [WheelItem], geometry: WheelGeometry, layoutSlots: [WheelLayoutSlot] = [], center: CGPoint? = nil, trackMouse: Bool = true, instant: Bool = false) {
         generation += 1
         let ticket = generation
         tracking?.invalidate(); tracking = nil
@@ -41,7 +41,7 @@ final class WheelPanel: NSPanel {
             state.presentationReady = immediate
             state.selectionHasOrigin = false
             state.selectionAngle = geometry.startAngle
-            state.geometry = geometry; state.items = items
+            state.geometry = geometry; state.items = items; state.layoutSlots = layoutSlots
             state.motion.lift = dynamicIconMovement ? 0 : 8
         }
         let origin = center ?? NSEvent.mouseLocation
@@ -96,7 +96,7 @@ final class WheelPanel: NSPanel {
         guard mouse != lastMouse else { return }
         lastMouse = mouse
         let dx = mouse.x-panel.frame.midX, dy = mouse.y-panel.frame.midY
-        let index = state.geometry.selectedIndex(dx: dx, dy: dy, count: state.items.count)
+        let index = state.selectedIndex(dx: dx, dy: dy)
         let lift = state.geometry.iconLift(distance: hypot(dx, dy), dynamic: dynamicIconMovement)
         if abs(state.motion.lift - lift) > 0.001 { state.motion.lift = lift }
         select(index, pointerAngle: atan2(-dy, dx))
@@ -105,7 +105,7 @@ final class WheelPanel: NSPanel {
     func select(_ index: Int?, pointerAngle: Double? = nil) {
         guard index != state.selected else { return }
         if let index, state.items.indices.contains(index) {
-            let target = state.geometry.angle(index: index, count: state.items.count)
+            let target = state.angle(for: index)
             state.selectionHasOrigin = state.selected != nil
             state.selectionAngle += WheelGeometry.selectionDelta(from: state.selectionAngle, to: target, pointer: pointerAngle)
             if haptics && !safeMode {
@@ -127,7 +127,7 @@ final class WheelPanel: NSPanel {
         let next = selectedID.flatMap { id in items.firstIndex { $0.id == id } }
         withAnimation(state.instantTransitions ? nil : .easeOut(duration: 0.12)) {
             state.items = items; state.selected = next
-            if let next { state.selectionAngle += WheelGeometry.shortestDelta(from: state.selectionAngle, to: state.geometry.angle(index: next, count: items.count)) }
+            if let next { state.selectionAngle += WheelGeometry.shortestDelta(from: state.selectionAngle, to: state.angle(for: next)) }
         }
         lastMouse = nil
     }
@@ -181,6 +181,15 @@ final class WheelPanel: NSPanel {
     let catalog = ApplicationCatalog()
     let store: PreferenceStore
     let actions: ActionService
+    private struct QuitterSession {
+        let slots: [WheelLayoutSlot]
+        let activeIdentifiers: Set<String>
+
+        func visibleItems(from items: [WheelItem]) -> [WheelItem] {
+            items.filter { $0.isTrash || activeIdentifiers.contains($0.layoutIdentifier) }
+        }
+    }
+    private var quitterSession: QuitterSession?
     private func transitionIsInstant() -> Bool {
         let instant = store.value.lessAnimation
         launcher.state.instantTransitions = instant; quitter.state.instantTransitions = instant
@@ -195,13 +204,51 @@ final class WheelPanel: NSPanel {
         catalog.runningAppsChanged = { [weak self] in self?.refreshQuitter() }
     }
     private func refreshQuitter() {
-        guard quitter.state.revealed else { return }
-        quitter.replaceItems(catalog.quitter(showsTrash: store.value.showsTrash, excluding: actions.pendingQuitIDs))
+        guard quitter.state.revealed, let session = quitterSession else { return }
+        // Session slots never change while visible. A terminated app disappears,
+        // but its direction remains an empty slot until this presentation closes.
+        let items = catalog.quitter(showsTrash: store.value.showsTrash, excluding: actions.pendingQuitIDs)
+        quitter.replaceItems(session.visibleItems(from: items))
+    }
+
+    private func newQuitterSession(items: [WheelItem], preferences: HaloPreferences, geometry: WheelGeometry) -> QuitterSession {
+        let launcherCount = preferences.launcherTargets.count
+        var launcherAngles: [String: Double] = [:]
+        for (index, target) in preferences.launcherTargets.enumerated() {
+            // One stable bundle identity has one launcher position. The first
+            // configured copy wins deterministically if an unusual duplicate exists.
+            launcherAngles[target.resolvedBundleIdentifier] = launcherAngles[target.resolvedBundleIdentifier]
+                ?? WheelGeometry().angle(index: index, count: launcherCount)
+        }
+        let fixedSlots = items.filter(\.isTrash).map {
+            WheelLayoutSlot(id: $0.layoutIdentifier, angle: geometry.startAngle)
+        }
+        let requests = items.filter { !$0.isTrash }.map { item in
+            let identifier = item.layoutIdentifier
+            let persistentID = item.stableIdentifier
+            return QuitterLayoutRequest(identifier: identifier,
+                                        launcherAngle: persistentID.flatMap { launcherAngles[$0] },
+                                        rememberedAngle: persistentID.flatMap { preferences.quitterPreferredAngles[$0] }.map(QuitterLayoutPlanner.angle(forNormalizedTurn:)),
+                                        persistsAngle: persistentID != nil)
+        }
+        let iconSize = geometry.itemSize(count: max(1, items.count))
+        let ratio = min(0.99, (iconSize + 6) / max(1, 2 * geometry.iconRadius))
+        let plan = QuitterLayoutPlanner.plan(requests: requests, fixedSlots: fixedSlots,
+            minimumSeparation: 2 * asin(ratio))
+        if !plan.newlyRememberedAngles.isEmpty {
+            var next = preferences
+            for (identifier, angle) in plan.newlyRememberedAngles { next.quitterPreferredAngles[identifier] = angle }
+            // Discovery is a local persistence detail, not a user-edited
+            // appearance change; do not cancel the wheel that just opened.
+            _ = store.save(next, notify: false)
+        }
+        return QuitterSession(slots: plan.slots, activeIdentifiers: Set(requests.map(\.identifier)))
     }
     func controller(_ wheel: HaloWheel) -> WheelController { wheel == .launcher ? launcher : quitter }
     func showWheel(_ wheel: HaloWheel) {
         let instant = transitionIsInstant()
         let isQuitter = wheel == .quitter
+        if isQuitter == false { quitterSession = nil }
         controller(isQuitter ? .launcher : .quitter).hide(immediately: true)
         let preferences = store.value
         let c = controller(wheel)
@@ -211,12 +258,20 @@ final class WheelPanel: NSPanel {
         c.state.highlightsTrash = preferences.highlightsTrash
         c.haptics = preferences.haptics
         c.dynamicIconMovement = preferences.dynamicIconMovement
-        c.show(items: isQuitter ? catalog.quitter(showsTrash: preferences.showsTrash, excluding: actions.pendingQuitIDs) : catalog.launcher(targets: preferences.launcherTargets), geometry: WheelGeometry(diameter: isQuitter ? preferences.quitterDiameter : preferences.launcherDiameter, selectionDistance: preferences.selectionDistance, maximumSelectionDistance: preferences.maximumSelectionDistance, quitter: isQuitter, trashPosition: preferences.trashPosition, thickness: preferences.wheelThickness), instant: instant)
+        let geometry = WheelGeometry(diameter: isQuitter ? preferences.quitterDiameter : preferences.launcherDiameter, selectionDistance: preferences.selectionDistance, maximumSelectionDistance: preferences.maximumSelectionDistance, quitter: isQuitter, trashPosition: preferences.trashPosition, thickness: preferences.wheelThickness)
+        if isQuitter {
+            let session = newQuitterSession(items: catalog.quitter(showsTrash: preferences.showsTrash, excluding: actions.pendingQuitIDs), preferences: preferences, geometry: geometry)
+            quitterSession = session
+            c.show(items: session.visibleItems(from: catalog.quitter(showsTrash: preferences.showsTrash, excluding: actions.pendingQuitIDs)), geometry: geometry, layoutSlots: session.slots, instant: instant)
+        } else {
+            c.show(items: catalog.launcher(targets: preferences.launcherTargets), geometry: geometry, instant: instant)
+        }
     }
     func hideWheel(_ wheel: HaloWheel) {
         let c = controller(wheel)
         if c.state.revealed { _ = transitionIsInstant() }
         c.hide()
+        if wheel == .quitter { quitterSession = nil }
     }
     func commitWheel(_ wheel: HaloWheel) {
         let c = controller(wheel)
@@ -224,6 +279,7 @@ final class WheelPanel: NSPanel {
         c.updateSelection()
         let item = c.takeSelection()
         c.hide()
+        if wheel == .quitter { quitterSession = nil }
         guard let item else { return }
         actions.prepare(item)
         if store.value.haptics && !actions.safeMode { NSHapticFeedbackManager.defaultPerformer.perform(.generic, performanceTime: .now) }
@@ -231,5 +287,5 @@ final class WheelPanel: NSPanel {
         DispatchQueue.main.async { [weak self] in self?.actions.perform(item) }
     }
     func frame(for wheel: HaloWheel) -> NSRect { controller(wheel).panel?.frame ?? .zero }
-    func stop() { launcher.hide(); quitter.hide(); catalog.stop() }
+    func stop() { quitterSession = nil; launcher.hide(); quitter.hide(); catalog.stop() }
 }

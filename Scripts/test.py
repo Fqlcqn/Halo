@@ -15,7 +15,7 @@ def main():
         run(*clang,'-framework','AppKit','-framework','Carbon','-framework','ApplicationServices','-framework','QuartzCore',
             'Tests/HaloRuntimeTests.m','Sources/Input/HaloRuntime.m','Sources/Input/HaloShortcuts.m','Sources/Settings/HaloSettings.m','-o',tmp/'runtime')
         run(tmp/'runtime',timeout=20)
-        run('xcrun','swiftc','-swift-version','6','-warnings-as-errors','Sources/Core/WheelGeometry.swift','Sources/Core/InteractionTiming.swift','Tests/GeometryTests.swift','-o',tmp/'geometry')
+        run('xcrun','swiftc','-swift-version','6','-warnings-as-errors','Sources/Core/WheelGeometry.swift','Sources/Core/InteractionTiming.swift','Sources/Wheel/QuitterLayout.swift','Tests/GeometryTests.swift','-o',tmp/'geometry')
         run(tmp/'geometry',timeout=20)
         run('osacompile','-o',tmp/'EmptyTrash.scpt','Resources/EmptyTrash.applescript')
         run('osacompile','-o',tmp/'CloseFinderWindows.scpt','-e','tell application "Finder" to close every window')

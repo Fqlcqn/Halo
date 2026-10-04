@@ -7,6 +7,17 @@ struct WheelItem: Identifiable {
     let name: String
     let icon: NSImage?
     let action: Action
+    /// The persistent app identity used by Quitter layout. Bundle IDs take
+    /// priority; URL keys only support apps that do not supply one.
+    var stableIdentifier: String? {
+        guard case .quit(let app) = action else { return nil }
+        if let identifier = app.bundleIdentifier, !identifier.isEmpty { return identifier }
+        if let url = app.bundleURL ?? app.executableURL {
+            return "url:\(url.standardizedFileURL.resolvingSymlinksInPath().path)"
+        }
+        return nil
+    }
+    var layoutIdentifier: String { stableIdentifier ?? id }
     var isTrash: Bool { if case .emptyTrash = action { return true }; return false }
 }
 
@@ -16,6 +27,7 @@ struct WheelItem: Identifiable {
     @Published var glassAmount: Double?
     @Published var selectionTint = HaloTint.white
     @Published var items: [WheelItem] = []
+    @Published var layoutSlots: [WheelLayoutSlot] = []
     @Published var selected: Int?
     @Published var selectionAngle = -Double.pi / 2
     @Published var selectionHasOrigin = false
@@ -26,6 +38,47 @@ struct WheelItem: Identifiable {
     @Published var instantTransitions = false
     @Published var geometry = WheelGeometry()
     @Published var highlightsTrash = true
+
+    func angle(for index: Int) -> Double {
+        guard items.indices.contains(index) else { return geometry.startAngle }
+        let item = items[index]
+        return layoutSlots.first(where: { $0.id == item.layoutIdentifier })?.angle
+            ?? geometry.angle(index: index, count: items.count)
+    }
+
+    func selectedIndex(dx: Double, dy: Double) -> Int? {
+        guard !layoutSlots.isEmpty else { return geometry.selectedIndex(dx: dx, dy: dy, count: items.count) }
+        guard let slotIndex = geometry.selectedIndex(dx: dx, dy: dy, angles: layoutSlots.map(\.angle)) else { return nil }
+        return items.firstIndex { $0.layoutIdentifier == layoutSlots[slotIndex].id }
+    }
+
+    /// Returns the half-widths before and after an item's fixed angle. Slots,
+    /// including emptied ones, define the boundaries for the whole session.
+    func sectorBounds(for index: Int) -> (before: Double, after: Double) {
+        guard !layoutSlots.isEmpty, items.indices.contains(index),
+              let current = layoutSlots.firstIndex(where: { $0.id == items[index].layoutIdentifier }) else {
+            let span = 2 * Double.pi / Double(max(1, items.count))
+            return (span / 2, span / 2)
+        }
+        guard layoutSlots.count > 1 else { return (.pi, .pi) }
+        let ordered = layoutSlots.sorted { Self.normalized($0.angle) < Self.normalized($1.angle) }
+        guard let position = ordered.firstIndex(where: { $0.id == layoutSlots[current].id }) else { return (.pi, .pi) }
+        let previous = ordered[(position + ordered.count - 1) % ordered.count].angle
+        let next = ordered[(position + 1) % ordered.count].angle
+        let angle = ordered[position].angle
+        return (Self.forwardDelta(from: previous, to: angle) / 2,
+                Self.forwardDelta(from: angle, to: next) / 2)
+    }
+
+    private static func normalized(_ angle: Double) -> Double {
+        let turn = 2 * Double.pi
+        let result = angle.truncatingRemainder(dividingBy: turn)
+        return result < 0 ? result + turn : result
+    }
+    private static func forwardDelta(from: Double, to: Double) -> Double {
+        let delta = normalized(to) - normalized(from)
+        return delta < 0 ? delta + 2 * Double.pi : delta
+    }
 }
 
 /// Pointer-distance changes invalidate only the icons, not the native glass.
@@ -75,10 +128,11 @@ struct RingGlass: View {
 private struct SelectionBand: View {
     let geometry: WheelGeometry
     let angle: Double
-    let span: Double
+    let before: Double
+    let after: Double
     let visible: Bool
     let tint: HaloTint
-    var sector: RingSector { RingSector(start: -span / 2, end: span / 2, innerRatio: geometry.innerDiameter / geometry.diameter) }
+    var sector: RingSector { RingSector(start: -before, end: after, innerRatio: geometry.innerDiameter / geometry.diameter) }
     var body: some View {
         ZStack {
             sector.fill(LinearGradient(colors: [
@@ -99,8 +153,10 @@ private struct SelectionBand: View {
 
 private struct LockedBand: View {
     let geometry: WheelGeometry
-    let span: Double
-    var shape: RingSector { .init(start: -span / 2, end: span / 2, innerRatio: geometry.innerDiameter / geometry.diameter) }
+    let before: Double
+    let after: Double
+    let angle: Double
+    var shape: RingSector { .init(start: -before, end: after, innerRatio: geometry.innerDiameter / geometry.diameter) }
     var body: some View {
         ZStack {
             shape.fill(LinearGradient(colors: [.white.opacity(0.08), .white.opacity(0.03)], startPoint: .top, endPoint: .bottom))
@@ -108,7 +164,7 @@ private struct LockedBand: View {
             shape.stroke(.white.opacity(0.06), lineWidth: 5).blur(radius: 10)
         }
         .frame(width: geometry.diameter, height: geometry.diameter)
-        .rotationEffect(.radians(geometry.startAngle))
+        .rotationEffect(.radians(angle))
     }
 }
 
@@ -144,11 +200,14 @@ struct WheelView: View {
     var body: some View {
         let visible = state.revealed && state.presentationReady
         let geometry = state.geometry
-        let span = 2 * Double.pi / Double(max(1, state.items.count))
+        let selectedBounds = state.selected.map { state.sectorBounds(for: $0) } ?? (0.0, 0.0)
+        let trashBounds = state.items.indices.first.map { state.sectorBounds(for: $0) } ?? (0.0, 0.0)
         ZStack {
             RingGlass(geometry: geometry, finish: state.glassFinish, amount: state.glassAmount)
-            if state.highlightsTrash && state.items.first?.isTrash == true { LockedBand(geometry: geometry, span: span) }
-            SelectionBand(geometry: geometry, angle: state.selectionAngle, span: span, visible: state.selected != nil, tint: state.selectionTint)
+            if state.highlightsTrash && state.items.first?.isTrash == true {
+                LockedBand(geometry: geometry, before: trashBounds.0, after: trashBounds.1, angle: state.angle(for: 0))
+            }
+            SelectionBand(geometry: geometry, angle: state.selectionAngle, before: selectedBounds.0, after: selectedBounds.1, visible: state.selected != nil, tint: state.selectionTint)
                 .opacity(0.65 + 0.35 * (state.glassAmount ?? state.glassFinish.level))
                 .animation(reduceMotion || !state.selectionHasOrigin ? nil : .spring(response: 0.14, dampingFraction: 0.98, blendDuration: 0.04), value: state.selectionAngle)
                 .animation(reduceMotion ? nil : .easeOut(duration: 0.10), value: state.selected != nil)
@@ -175,7 +234,7 @@ private struct WheelIcons: View {
         ZStack {
             ForEach(Array(state.items.enumerated()), id: \.element.id) { index, item in
                 let selected = index == state.selected
-                let offset = state.geometry.offset(index: index, count: state.items.count, selected: selected, lift: motion.lift)
+                let offset = state.geometry.offset(angle: state.angle(for: index), selected: selected, lift: motion.lift)
                 IconTile(item: item, selected: selected, size: state.geometry.itemSize(count: state.items.count))
                     .offset(x: offset.x, y: offset.y)
                     .transition(.opacity.combined(with: .scale(scale: 0.85)))

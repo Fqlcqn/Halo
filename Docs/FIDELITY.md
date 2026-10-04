@@ -4,6 +4,13 @@ Reference: Halo 0.2.1 (6), copied from the former hybrid project's `Latest/Halo.
 
 ## Measured/recovered constants
 
+Version 1.2.5 replaces the historical symmetric Quitter reflow with a stable
+directional layout. Launcher bundle identifiers supply their current Launcher
+angles; other applications persist normalized angles locally. A visible Quitter
+session retains all of its initial slots so removal creates an empty inert
+sector rather than moving another app. This is a deliberate productivity change,
+not a claim about the historical reference implementation.
+
 Version 1.2.2 uses a visibly animated 105 ms ease-out reveal with 95% starting scale and 40 ms collapse. A separate presentation state prevents reset/reveal coalescing while immediate interaction, interruption guards, Less animation, and Reduce Motion remain supported. These values supersede the historical visibility timings below.
 
 Version 1.1.2 extends the 1.1.1 continuous annular renderer with 21 light, liquid-biased glass levels and a 36–78 pt ring-thickness scale. Oppositely wound ellipses preserve both lens boundaries and the clear center without repeated circle joins. More diffusion is achieved with lighter native regular material rather than a dark overlay. The original cropped disc, the 96-circle intermediate renderer, and the 5-point inset veil below are historical, not current. Optical sampling remains system-controlled; no fixed-resolution or exact iOS compositor claim is made. Both Settings previews share production geometry and allow a draggable wheel-mode switch.

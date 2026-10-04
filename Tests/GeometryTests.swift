@@ -24,6 +24,39 @@ import Foundation
         expect(try! JSONDecoder().decode(HaloPreferences.self, from: JSONEncoder().encode(perApp)) == perApp, "Per-app rules survive export and relaunch")
         perApp.appQuitOverrides.removeValue(forKey: "example.editor")
         expect(perApp.shouldForceQuit("example.editor"), "Use default removes override")
+        let fixedTrash = [WheelLayoutSlot(id: "action:empty-trash", angle: .pi / 2)]
+        let initialLayout = QuitterLayoutPlanner.plan(requests: [
+            .init(identifier: "com.apple.Safari", launcherAngle: -.pi / 2, rememberedAngle: nil, persistsAngle: true),
+            .init(identifier: "com.spotify.client", launcherAngle: nil, rememberedAngle: 0, persistsAngle: true),
+            .init(identifier: "com.apple.Terminal", launcherAngle: nil, rememberedAngle: nil, persistsAngle: true)
+        ], fixedSlots: fixedTrash, minimumSeparation: 0.32)
+        func layoutAngle(_ id: String, _ plan: QuitterLayoutPlan) -> Double { plan.slots.first(where: { $0.id == id })!.angle }
+        expect(abs(WheelGeometry.shortestDelta(from: layoutAngle("com.apple.Safari", initialLayout), to: -.pi / 2)) < 0.000001, "Launcher app retains its launcher direction in Quitter")
+        expect(abs(WheelGeometry.shortestDelta(from: layoutAngle("com.spotify.client", initialLayout), to: 0)) < 0.000001, "Remembered Quitter app retains its angle")
+        expect(initialLayout.newlyRememberedAngles["com.apple.Terminal"] != nil, "Unmapped app receives a persisted deterministic angle")
+        let reopenedLayout = QuitterLayoutPlanner.plan(requests: [
+            .init(identifier: "com.apple.Safari", launcherAngle: -.pi / 2, rememberedAngle: nil, persistsAngle: true),
+            .init(identifier: "com.spotify.client", launcherAngle: nil, rememberedAngle: 0, persistsAngle: true),
+            .init(identifier: "com.apple.Terminal", launcherAngle: nil, rememberedAngle: initialLayout.newlyRememberedAngles["com.apple.Terminal"].map(QuitterLayoutPlanner.angle(forNormalizedTurn:)), persistsAngle: true)
+        ], fixedSlots: fixedTrash, minimumSeparation: 0.32)
+        expect(initialLayout.slots.allSatisfy { slot in
+            reopenedLayout.slots.first(where: { $0.id == slot.id }).map {
+                abs(WheelGeometry.shortestDelta(from: slot.angle, to: $0.angle)) < 0.000001
+            } ?? false
+        } && reopenedLayout.newlyRememberedAngles.isEmpty, "Reopening preserves remembered Quitter directions")
+        let collision = QuitterLayoutPlanner.plan(requests: [
+            .init(identifier: "launcher", launcherAngle: 0, rememberedAngle: nil, persistsAngle: true),
+            .init(identifier: "remembered", launcherAngle: nil, rememberedAngle: 0, persistsAngle: true)
+        ], fixedSlots: [], minimumSeparation: 0.4)
+        expect(abs(WheelGeometry.shortestDelta(from: layoutAngle("launcher", collision), to: 0)) < 0.000001 &&
+               abs(WheelGeometry.shortestDelta(from: layoutAngle("launcher", collision), to: layoutAngle("remembered", collision))) >= 0.4,
+               "Launcher assignment wins a collision over remembered Quitter angle")
+        let newOne = QuitterLayoutPlanner.plan(requests: [.init(identifier: "new.one", launcherAngle: nil, rememberedAngle: nil, persistsAngle: true)], fixedSlots: fixedTrash, minimumSeparation: 0.2)
+        let newTwo = QuitterLayoutPlanner.plan(requests: [
+            .init(identifier: "new.two", launcherAngle: nil, rememberedAngle: nil, persistsAngle: true),
+            .init(identifier: "new.one", launcherAngle: nil, rememberedAngle: nil, persistsAngle: true)
+        ], fixedSlots: fixedTrash, minimumSeparation: 0.2)
+        expect(layoutAngle("new.one", newOne) == layoutAngle("new.one", newTwo), "New app placement uses stable tie-breaking rather than running-app order")
         for reach in [nil, 100.0, 1200.0] as [Double?] {
             let preview = WheelGeometry(maximumSelectionDistance: reach)
             let size = preview.panelSize
@@ -198,6 +231,7 @@ import Foundation
         _ = store.save(HaloPreferences())
         expect(store.value == HaloPreferences(), "Clean install defaults")
         expect(store.value.glassFinish == .standard, "Existing glass is the default")
+        expect(store.value.quitterPreferredAngles.isEmpty, "Fresh installs start with no remembered Quitter layout")
         for finish in WheelGlassFinish.allCases {
             var setting = HaloPreferences(); setting.glassFinish = finish
             expect(store.save(setting) && PreferenceStore(defaults: defaults).value.glassFinish == finish, "All glass presets survive relaunch")
@@ -226,7 +260,11 @@ import Foundation
         defaults.set(try! JSONSerialization.data(withJSONObject: legacy), forKey: PreferenceStore.key)
         expect(PreferenceStore(defaults: defaults).value == preferences, "Old settings migrate without losing customization")
         preferences.appQuitOverrides = ["example.editor": false, "example.game": true]
+        preferences.quitterPreferredAngles = ["example.editor": 0.25, "url:/Applications/NoBundle.app": 0.75]
         expect(store.save(preferences) && PreferenceStore(defaults: defaults).value == preferences, "Per-app rules persist immediately to a fresh store")
+        preferences.quitterPreferredAngles["example.editor"] = 1
+        expect(!store.save(preferences), "Invalid normalized Quitter angle is rejected")
+        preferences.quitterPreferredAngles["example.editor"] = 0.25
         preferences.lessAnimation = true; preferences.previewHaptics = true; preferences.haptics = false
         expect(store.save(preferences) && PreferenceStore(defaults: defaults).value == preferences, "Animation and independent preview feedback survive relaunch")
         preferences.maximumSelectionDistance = 320; preferences.dynamicIconMovement = true

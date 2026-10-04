@@ -1,5 +1,11 @@
 # Verification record
 
+## October 4, 2026 — 1.2.5 (17)
+
+- Pure layout checks cover Launcher-angle priority, remembered normalized-angle persistence, deterministic largest-gap assignment, collision priority, and reopening without direction changes. Native window checks cover fixed slot hit testing and inert empty slots after live item removal.
+- Quitter stores bundle identifier to normalized angle locally; app/executable URL is only a fallback when macOS has no bundle identifier. Initial session slots are fixed until close, so newly launched apps wait for the next opening.
+- Automated verification uses fixture items only. Live app quitting, force quitting, Finder window closing, and Empty Trash remain manual checks.
+
 ## October 3, 2026 — 1.2.4 (16)
 
 - Regular Quit is now the global product default. Version 1 preferences migrate to it, while explicit bundle-ID per-app choices remain intact. Force quit remains an opt-in Advanced setting.

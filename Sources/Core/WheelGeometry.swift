@@ -1,6 +1,13 @@
 import Foundation
 import CoreGraphics
 
+/// A stable visual direction used by a wheel presentation. It is independent
+/// of the transient running-app array order.
+struct WheelLayoutSlot: Equatable, Identifiable {
+    let id: String
+    let angle: Double
+}
+
 /// Sliders travel through discrete indices so labels, persisted values and
 /// feedback share exactly the same stops. Imported legacy values are preserved
 /// until the user actually moves the control.
@@ -56,20 +63,31 @@ struct WheelGeometry: Equatable {
     }
 
     func offset(index: Int, count: Int, selected: Bool, lift: Double = 8) -> CGPoint {
-        let a = angle(index: index, count: count), radius = iconRadius + (selected ? min(8, max(0, lift)) : 0)
+        offset(angle: angle(index: index, count: count), selected: selected, lift: lift)
+    }
+
+    func offset(angle: Double, selected: Bool, lift: Double = 8) -> CGPoint {
+        let radius = iconRadius + (selected ? min(8, max(0, lift)) : 0)
+        let a = angle
         return CGPoint(x: cos(a) * radius, y: sin(a) * radius)
     }
 
     /// AppKit global coordinates: positive y points upward.
     func selectedIndex(dx: Double, dy: Double, count: Int) -> Int? {
-        guard count > 0, dx.isFinite, dy.isFinite else { return nil }
+        selectedIndex(dx: dx, dy: dy, angles: (0..<count).map { angle(index: $0, count: count) })
+    }
+
+    /// Shared radial hit-test for a fixed visual layout. Unlike count-based
+    /// selection, these angles do not shift when an item disappears.
+    func selectedIndex(dx: Double, dy: Double, angles: [Double]) -> Int? {
+        guard !angles.isEmpty, dx.isFinite, dy.isFinite else { return nil }
         let distance = hypot(dx, dy)
         guard distance.isFinite, distance >= selectionDistance,
               maximumSelectionDistance.map({ distance <= $0 }) ?? true else { return nil }
         let pointer = atan2(-dy, dx)
         var best: (Int, Double)?
-        for index in 0..<count {
-            let delta = abs(Self.shortestDelta(from: angle(index: index, count: count), to: pointer))
+        for (index, angle) in angles.enumerated() {
+            let delta = abs(Self.shortestDelta(from: angle, to: pointer))
             if best == nil || delta < best!.1 { best = (index, delta) }
         }
         return best?.0
@@ -214,7 +232,8 @@ struct HaloPreferences: Codable, Equatable {
         if glassLevel == 1 { return "Translucent" }
         return "\(Int((glassLevel * 100).rounded()))% diffusion"
     }
-    var version = 2
+    var quitterPreferredAngles: [String: Double] = [:]
+    var version = 3
     var launcherDiameter = 300.0
     var quitterDiameter = 300.0
     var selectionDistance = 86.0
@@ -229,7 +248,7 @@ struct HaloPreferences: Codable, Equatable {
 
     init() {}
     enum CodingKeys: String, CodingKey {
-        case lessAnimation, previewHaptics, appQuitOverrides
+        case lessAnimation, previewHaptics, appQuitOverrides, quitterPreferredAngles
         case glassFinish, glassAmount, wheelThickness, settingsTint, selectionTint, forceQuitApps
         case version, launcherDiameter, quitterDiameter, selectionDistance, maximumSelectionDistance
         case dynamicIconMovement, launcherTargets, haptics, showSettingsOnLaunch
@@ -249,10 +268,11 @@ struct HaloPreferences: Codable, Equatable {
             ? (try c.decodeIfPresent(Bool.self, forKey: .forceQuitApps) ?? false)
             : false
         appQuitOverrides = try c.decodeIfPresent([String: Bool].self, forKey: .appQuitOverrides) ?? [:]
+        quitterPreferredAngles = try c.decodeIfPresent([String: Double].self, forKey: .quitterPreferredAngles) ?? [:]
         glassFinish = try c.decodeIfPresent(WheelGlassFinish.self, forKey: .glassFinish) ?? .standard
         glassAmount = try c.decodeIfPresent(Double.self, forKey: .glassAmount)
         wheelThickness = try c.decodeIfPresent(Double.self, forKey: .wheelThickness) ?? 66
-        version = 2
+        version = 3
         launcherDiameter = try c.decode(Double.self, forKey: .launcherDiameter)
         quitterDiameter = try c.decode(Double.self, forKey: .quitterDiameter)
         selectionDistance = try c.decode(Double.self, forKey: .selectionDistance)
@@ -267,8 +287,10 @@ struct HaloPreferences: Codable, Equatable {
     }
 
     var isValid: Bool {
-        version == 2 && appQuitOverrides.count <= 512 &&
+        version == 3 && appQuitOverrides.count <= 512 &&
         appQuitOverrides.keys.allSatisfy { !$0.isEmpty && $0.count <= 255 } &&
+        quitterPreferredAngles.count <= 512 &&
+        quitterPreferredAngles.allSatisfy { key, value in !key.isEmpty && key.count <= 4096 && value.isFinite && (0..<1).contains(value) } &&
         settingsTint.isValid && selectionTint.isValid &&
         wheelThickness.isFinite && (36...78).contains(wheelThickness) &&
         (glassAmount.map { $0.isFinite && (0...1).contains($0) } ?? true) &&
@@ -305,13 +327,15 @@ final class PreferenceStore {
         }
     }
 
-    @discardableResult func save(_ value: HaloPreferences) -> Bool {
+    @discardableResult func save(_ value: HaloPreferences, notify: Bool = true) -> Bool {
         guard value.isValid, let encoded = try? JSONEncoder().encode(value) else { return false }
         defaults.set(encoded, forKey: Self.key)
         guard defaults.synchronize() else { return false }
         self.value = value
-        NotificationCenter.default.post(name: Notification.Name("HaloAppearanceChanged"), object: nil)
-        onChange?()
+        if notify {
+            NotificationCenter.default.post(name: Notification.Name("HaloAppearanceChanged"), object: nil)
+            onChange?()
+        }
         return true
     }
 }

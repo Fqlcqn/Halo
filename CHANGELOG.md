@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.2.5 (17) — stable Quitter directions, 2026-10-04
+
+- Quitter no longer redistributes running apps into a symmetrical layout. Apps that also appear in Launcher use the matching Launcher direction; other apps remember a normalized angle by bundle identifier, falling back to an app/executable URL only when macOS provides no bundle identifier.
+- A Quitter presentation now freezes its slots. Apps that quit disappear immediately but leave an inert empty direction until the wheel closes. Newly launched apps wait for the next presentation, preventing live layout changes.
+- New apps fill the largest available angular gap deterministically. Launcher positions win collisions, then remembered positions, then fresh assignments; fixed Trash remains in its configured direction.
+
 ## 1.2.4 (16) — safe default for Quitter, 2026-10-03
 
 - Quitter now uses regular Quit by default, allowing apps to save or ask before closing. Advanced → Force quit apps remains available for users who deliberately want force quitting globally.
