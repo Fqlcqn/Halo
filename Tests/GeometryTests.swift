@@ -232,6 +232,7 @@ import Foundation
         expect(store.value == HaloPreferences(), "Clean install defaults")
         expect(store.value.glassFinish == .standard, "Existing glass is the default")
         expect(store.value.quitterPreferredAngles.isEmpty, "Fresh installs start with no remembered Quitter layout")
+        expect(!store.value.stableQuitterPositions, "Automatic even Quitter layout is the default")
         for finish in WheelGlassFinish.allCases {
             var setting = HaloPreferences(); setting.glassFinish = finish
             expect(store.save(setting) && PreferenceStore(defaults: defaults).value.glassFinish == finish, "All glass presets survive relaunch")
@@ -257,10 +258,16 @@ import Foundation
         legacy.removeValue(forKey: "glassFinish")
         legacy.removeValue(forKey: "lessAnimation"); legacy.removeValue(forKey: "previewHaptics")
         legacy.removeValue(forKey: "appQuitOverrides")
+        legacy.removeValue(forKey: "stableQuitterPositions")
         defaults.set(try! JSONSerialization.data(withJSONObject: legacy), forKey: PreferenceStore.key)
         expect(PreferenceStore(defaults: defaults).value == preferences, "Old settings migrate without losing customization")
         preferences.appQuitOverrides = ["example.editor": false, "example.game": true]
         preferences.quitterPreferredAngles = ["example.editor": 0.25, "url:/Applications/NoBundle.app": 0.75]
+        for enabled in [true, false] {
+            preferences.stableQuitterPositions = enabled
+            expect(store.save(preferences) && PreferenceStore(defaults: defaults).value == preferences,
+                   "Quitter layout toggle persists immediately without deleting remembered angles")
+        }
         expect(store.save(preferences) && PreferenceStore(defaults: defaults).value == preferences, "Per-app rules persist immediately to a fresh store")
         preferences.quitterPreferredAngles["example.editor"] = 1
         expect(!store.save(preferences), "Invalid normalized Quitter angle is rejected")

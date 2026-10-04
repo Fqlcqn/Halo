@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.2.6 (18) — optional stable layout and compact Settings, 2026-10-04
+
+- Restored evenly spaced, automatically rearranging Quitter apps as the default, including for existing settings. Apps → Quitter → Stable app positions enables the remembered-direction layout; switching it off preserves remembered positions for later use. Quit, Force Quit, Finder and Trash actions are unchanged.
+- Both Settings previews now use the selected Quitter layout, with matching icon positions, selection and highlights.
+- Apps uses a compact two-column layout with the preview beside its controls, removing the large bottom gap. Launcher/Quitter switching retains a fixed header and window size. Tightened Appearance, General and Advanced sizing and card spacing without adding scrolling.
+
 ## 1.2.5 (17) — stable Quitter directions, 2026-10-04
 
 - Quitter no longer redistributes running apps into a symmetrical layout. Apps that also appear in Launcher use the matching Launcher direction; other apps remember a normalized angle by bundle identifier, falling back to an app/executable URL only when macOS provides no bundle identifier.

@@ -39,8 +39,11 @@ struct WheelEditor: View {
                 switch phase {
                 case .active(let point):
                     let active = state.items.firstIndex { $0.id == hovered }
-                    let hit = state.geometry.editorHit(at: point, count: state.items.count,
-                        selected: state.selected, lift: state.motion.lift, active: active)
+                    let hit = quitter
+                        ? state.selectedIndex(dx: point.x - state.geometry.panelSize / 2,
+                                              dy: state.geometry.panelSize / 2 - point.y)
+                        : state.geometry.editorHit(at: point, count: state.items.count,
+                            selected: state.selected, lift: state.motion.lift, active: active)
                     hovered = hit.map { state.items[$0].id }
                     select(at: point, override: editable && !quitter ? hit : nil)
                 case .ended: state.selected = nil; hovered = nil
@@ -72,7 +75,7 @@ struct WheelEditor: View {
     private func editorIcon(_ item: WheelItem) -> some View {
         let index = state.items.firstIndex(where: { $0.id == item.id }) ?? 0
         let geometry = state.geometry
-        let offset = geometry.offset(index: index, count: state.items.count, selected: state.selected == index, lift: state.motion.lift)
+        let offset = geometry.offset(angle: state.angle(for: index), selected: state.selected == index, lift: state.motion.lift)
         let point = dragging == item.id ? (dragPoint ?? CGPoint(x: geometry.panelSize / 2 + offset.x, y: geometry.panelSize / 2 + offset.y))
             : CGPoint(x: geometry.panelSize / 2 + offset.x, y: geometry.panelSize / 2 + offset.y)
         return IconTile(item: item, selected: hovered == item.id || dragging == item.id, size: geometry.itemSize(count: state.items.count))
@@ -125,14 +128,15 @@ struct WheelEditor: View {
     private func select(at point: CGPoint, override: Int? = nil) {
         let g = state.geometry
         let dx = point.x - g.panelSize / 2, dy = g.panelSize / 2 - point.y
-        let index = override ?? g.previewIndex(at: point, count: state.items.count)
+        let inside = (0...g.panelSize).contains(point.x) && (0...g.panelSize).contains(point.y)
+        let index = inside ? (override ?? state.selectedIndex(dx: dx, dy: dy)) : nil
         state.motion.lift = g.iconLift(distance: hypot(dx, dy), dynamic: preferences.dynamicIconMovement)
         if let index, index != state.selected {
             if preferences.previewHaptics {
                 NSHapticFeedbackManager.defaultPerformer.perform(quitter ? .alignment : .levelChange, performanceTime: .now)
             }
             state.selectionHasOrigin = state.selected != nil
-            state.selectionAngle += WheelGeometry.selectionDelta(from: state.selectionAngle, to: g.angle(index: index, count: state.items.count), pointer: atan2(-dy, dx))
+            state.selectionAngle += WheelGeometry.selectionDelta(from: state.selectionAngle, to: state.angle(for: index), pointer: atan2(-dy, dx))
         }
         state.selected = index
     }
@@ -145,7 +149,11 @@ struct WheelEditor: View {
         state.selectionTint = preferences.selectionTint
         state.revealed = true; state.selected = nil
         let items = quitter ? catalog.quitter(showsTrash: preferences.showsTrash) : catalog.launcher(targets: preferences.launcherTargets)
-        withAnimation(animation) { state.items = items }
+        withAnimation(animation) {
+            state.layoutSlots = quitter && preferences.stableQuitterPositions
+                ? WheelCoordinator.stableLayout(items: items, preferences: preferences, geometry: state.geometry).slots : []
+            state.items = items
+        }
     }
     private func remove(_ id: String) {
         withAnimation(animation) { preferences.launcherTargets.removeAll { $0.id == id } }

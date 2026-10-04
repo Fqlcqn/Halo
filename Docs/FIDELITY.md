@@ -4,11 +4,11 @@ Reference: Halo 0.2.1 (6), copied from the former hybrid project's `Latest/Halo.
 
 ## Measured/recovered constants
 
-Version 1.2.5 replaces the historical symmetric Quitter reflow with a stable
-directional layout. Launcher bundle identifiers supply their current Launcher
+Version 1.2.6 restores symmetric Quitter reflow by default and makes the 1.2.5
+stable directional layout optional in Apps → Quitter. When enabled, Launcher bundle identifiers supply their current Launcher
 angles; other applications persist normalized angles locally. A visible Quitter
 session retains all of its initial slots so removal creates an empty inert
-sector rather than moving another app. This is a deliberate productivity change,
+sector rather than moving another app. This is an opt-in productivity change,
 not a claim about the historical reference implementation.
 
 Version 1.2.2 uses a visibly animated 105 ms ease-out reveal with 95% starting scale and 40 ms collapse. A separate presentation state prevents reset/reveal coalescing while immediate interaction, interruption guards, Less animation, and Reduce Motion remain supported. These values supersede the historical visibility timings below.

@@ -133,7 +133,7 @@ static NSView *glass(NSRect frame, __unused CGFloat radius, NSView *parent) {
 - (void)windowDidResignKey:(__unused NSNotification *)note { if (_recording>=0) [self stopRecording]; }
 - (void)selectTab:(NSButton *)sender { [self stopRecording]; _tab=sender.tag; [self drawPage]; }
 - (void)drawPage {
-    [self layoutPageWithSize:_tab==1?NSMakeSize(960,740):_tab==2?NSMakeSize(960,740):_tab==3?NSMakeSize(700,570):NSMakeSize(700,500)];
+    [self layoutPageWithSize:_tab==1?NSMakeSize(960,700):_tab==2?NSMakeSize(960,600):_tab==3?NSMakeSize(700,535):NSMakeSize(700,480)];
     [self populatePage];
 }
 - (void)layoutPageWithSize:(NSSize)size {
@@ -166,7 +166,7 @@ static NSView *glass(NSRect frame, __unused CGFloat radius, NSView *parent) {
     CGFloat width=_page.bounds.size.width-8;
     CGFloat controlX=width-226;
     for (NSInteger i=0;i<3;i++) {
-        CGFloat y=48+(i*94);
+        CGFloat y=46+(i*94);
         NSView *card=[[HaloFlippedView alloc] initWithFrame:NSMakeRect(0,y,width,84)]; [_page addSubview:card];
         card.wantsLayer=YES; card.layer.cornerRadius=12;
         card.layer.backgroundColor=[NSColor.whiteColor colorWithAlphaComponent:.035].CGColor;
@@ -196,9 +196,9 @@ static NSView *glass(NSRect frame, __unused CGFloat radius, NSView *parent) {
     _status=label(@"",11,NSFontWeightRegular,NSMakeRect(0,336,width-110,44));
     _status.textColor=NSColor.secondaryLabelColor; [_page addSubview:_status];
     _permission=button(@"Enable…",self,@selector(permission:),NSMakeRect(width-96,336,96,28)); [_page addSubview:_permission];
-    NSButton *reset=button(@"Reset shortcuts",self,@selector(reset:),NSMakeRect(0,394,116,28));
+    NSButton *reset=button(@"Reset shortcuts",self,@selector(reset:),NSMakeRect(0,382,116,28));
     reset.bordered=NO; reset.font=[NSFont systemFontOfSize:11]; reset.contentTintColor=NSColor.secondaryLabelColor; [_page addSubview:reset];
-    _cancelRecord=button(@"Cancel",self,@selector(cancelRecord:),NSMakeRect(width-90,394,90,28));
+    _cancelRecord=button(@"Cancel",self,@selector(cancelRecord:),NSMakeRect(width-90,382,90,28));
     _cancelRecord.hidden=YES; [_page addSubview:_cancelRecord];
     [self updateControls]; [self refreshStatus];
 }

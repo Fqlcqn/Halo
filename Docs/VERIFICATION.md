@@ -1,5 +1,12 @@
 # Verification record
 
+## October 4, 2026 — 1.2.6 (18)
+
+- `make verify` passed: 18,583 geometry/layout/preferences checks, 3,989 native window/lifecycle checks (including 100 rapid cycles), shortcut/runtime tests and harmless Trash simulations. Native totals can vary with the number of running apps inspected by safe coordinator checks.
+- Tests cover automatic layout as the new/existing-install default, immediate layout-toggle persistence without losing remembered angles, stable → automatic switching through the real coordinator, and even reflow after fixture removal. Stable-session empty slots remain covered. Quit/Force Quit, Finder and Trash action routing is unchanged.
+- Safe isolated Settings inspection covered all four resized pages, Launcher/Quitter switching, and enabling/disabling stable positions with visible preview changes. Apps retains a 960 × 600 window and fixed preview/header footprint in both modes; all controls fit without scrolling. Appearance is 960 × 700, General 700 × 480, Advanced 700 × 535. Diagnostic apps were quit afterward; user preferences were not changed by UI testing.
+- Source/app ZIPs and installed-bundle equality are checked through `make package` and `make status`. Physical shortcuts/haptics, destructive actions, clean-Mac acceptance, notarization and App Store eligibility are not inferred from these checks. Publishing a GitHub release and uploading its assets remain separate from pushing source.
+
 ## October 4, 2026 — 1.2.5 (17)
 
 - Pure layout checks cover Launcher-angle priority, remembered normalized-angle persistence, deterministic largest-gap assignment, collision priority, and reopening without direction changes. Native window checks cover fixed slot hit testing and inert empty slots after live item removal.

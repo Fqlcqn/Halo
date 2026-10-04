@@ -204,14 +204,13 @@ final class WheelPanel: NSPanel {
         catalog.runningAppsChanged = { [weak self] in self?.refreshQuitter() }
     }
     private func refreshQuitter() {
-        guard quitter.state.revealed, let session = quitterSession else { return }
-        // Session slots never change while visible. A terminated app disappears,
-        // but its direction remains an empty slot until this presentation closes.
+        guard quitter.state.revealed else { return }
+        // Stable mode retains empty slots; automatic mode reflows running apps.
         let items = catalog.quitter(showsTrash: store.value.showsTrash, excluding: actions.pendingQuitIDs)
-        quitter.replaceItems(session.visibleItems(from: items))
+        quitter.replaceItems(quitterSession?.visibleItems(from: items) ?? items)
     }
 
-    private func newQuitterSession(items: [WheelItem], preferences: HaloPreferences, geometry: WheelGeometry) -> QuitterSession {
+    static func stableLayout(items: [WheelItem], preferences: HaloPreferences, geometry: WheelGeometry) -> QuitterLayoutPlan {
         let launcherCount = preferences.launcherTargets.count
         var launcherAngles: [String: Double] = [:]
         for (index, target) in preferences.launcherTargets.enumerated() {
@@ -233,8 +232,12 @@ final class WheelPanel: NSPanel {
         }
         let iconSize = geometry.itemSize(count: max(1, items.count))
         let ratio = min(0.99, (iconSize + 6) / max(1, 2 * geometry.iconRadius))
-        let plan = QuitterLayoutPlanner.plan(requests: requests, fixedSlots: fixedSlots,
+        return QuitterLayoutPlanner.plan(requests: requests, fixedSlots: fixedSlots,
             minimumSeparation: 2 * asin(ratio))
+    }
+
+    private func newQuitterSession(items: [WheelItem], preferences: HaloPreferences, geometry: WheelGeometry) -> QuitterSession {
+        let plan = Self.stableLayout(items: items, preferences: preferences, geometry: geometry)
         if !plan.newlyRememberedAngles.isEmpty {
             var next = preferences
             for (identifier, angle) in plan.newlyRememberedAngles { next.quitterPreferredAngles[identifier] = angle }
@@ -242,7 +245,7 @@ final class WheelPanel: NSPanel {
             // appearance change; do not cancel the wheel that just opened.
             _ = store.save(next, notify: false)
         }
-        return QuitterSession(slots: plan.slots, activeIdentifiers: Set(requests.map(\.identifier)))
+        return QuitterSession(slots: plan.slots, activeIdentifiers: Set(items.map(\.layoutIdentifier)))
     }
     func controller(_ wheel: HaloWheel) -> WheelController { wheel == .launcher ? launcher : quitter }
     func showWheel(_ wheel: HaloWheel) {
@@ -260,9 +263,10 @@ final class WheelPanel: NSPanel {
         c.dynamicIconMovement = preferences.dynamicIconMovement
         let geometry = WheelGeometry(diameter: isQuitter ? preferences.quitterDiameter : preferences.launcherDiameter, selectionDistance: preferences.selectionDistance, maximumSelectionDistance: preferences.maximumSelectionDistance, quitter: isQuitter, trashPosition: preferences.trashPosition, thickness: preferences.wheelThickness)
         if isQuitter {
-            let session = newQuitterSession(items: catalog.quitter(showsTrash: preferences.showsTrash, excluding: actions.pendingQuitIDs), preferences: preferences, geometry: geometry)
+            let items = catalog.quitter(showsTrash: preferences.showsTrash, excluding: actions.pendingQuitIDs)
+            let session = preferences.stableQuitterPositions ? newQuitterSession(items: items, preferences: preferences, geometry: geometry) : nil
             quitterSession = session
-            c.show(items: session.visibleItems(from: catalog.quitter(showsTrash: preferences.showsTrash, excluding: actions.pendingQuitIDs)), geometry: geometry, layoutSlots: session.slots, instant: instant)
+            c.show(items: items, geometry: geometry, layoutSlots: session?.slots ?? [], instant: instant)
         } else {
             c.show(items: catalog.launcher(targets: preferences.launcherTargets), geometry: geometry, instant: instant)
         }

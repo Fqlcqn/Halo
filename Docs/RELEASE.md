@@ -1,6 +1,6 @@
 # GitHub release checklist
 
-Current version: **1.2.5 (17)**. Distribution is direct download, not the App Store.
+Current version: **1.2.6 (18)**. Distribution is direct download, not the App Store.
 The app is universal, hardened-runtime enabled, non-sandboxed, and ad-hoc signed.
 It is not Developer ID signed, notarized, or independently security audited.
 
@@ -21,8 +21,8 @@ It is not Developer ID signed, notarized, or independently security audited.
 5. Create the official repository and enable private vulnerability reporting.
    Put a private contact method on the owner's profile before announcing it.
    Commit only tracked source/docs, never local Reference/Backups/Deployments.
-6. Commit/push the 1.2.5 changes, then create tag/release v1.2.5 at that commit and attach Dist/Halo-1.2.5-macOS.zip,
-   Dist/Halo-1.2.5-source.zip, and Dist/SHA256SUMS. Include the signing limitation,
+6. Commit/push the 1.2.6 changes, then create tag/release v1.2.6 at that commit and attach Dist/Halo-1.2.6-macOS.zip,
+   Dist/Halo-1.2.6-source.zip, and Dist/SHA256SUMS. Include the signing limitation,
    macOS 26 requirement, force-quit/Trash warning, and changes in release notes.
    This workspace does not create a repository or publish automatically.
 

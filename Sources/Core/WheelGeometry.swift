@@ -233,6 +233,7 @@ struct HaloPreferences: Codable, Equatable {
         return "\(Int((glassLevel * 100).rounded()))% diffusion"
     }
     var quitterPreferredAngles: [String: Double] = [:]
+    var stableQuitterPositions = false
     var version = 3
     var launcherDiameter = 300.0
     var quitterDiameter = 300.0
@@ -248,7 +249,7 @@ struct HaloPreferences: Codable, Equatable {
 
     init() {}
     enum CodingKeys: String, CodingKey {
-        case lessAnimation, previewHaptics, appQuitOverrides, quitterPreferredAngles
+        case lessAnimation, previewHaptics, appQuitOverrides, quitterPreferredAngles, stableQuitterPositions
         case glassFinish, glassAmount, wheelThickness, settingsTint, selectionTint, forceQuitApps
         case version, launcherDiameter, quitterDiameter, selectionDistance, maximumSelectionDistance
         case dynamicIconMovement, launcherTargets, haptics, showSettingsOnLaunch
@@ -269,6 +270,7 @@ struct HaloPreferences: Codable, Equatable {
             : false
         appQuitOverrides = try c.decodeIfPresent([String: Bool].self, forKey: .appQuitOverrides) ?? [:]
         quitterPreferredAngles = try c.decodeIfPresent([String: Double].self, forKey: .quitterPreferredAngles) ?? [:]
+        stableQuitterPositions = try c.decodeIfPresent(Bool.self, forKey: .stableQuitterPositions) ?? false
         glassFinish = try c.decodeIfPresent(WheelGlassFinish.self, forKey: .glassFinish) ?? .standard
         glassAmount = try c.decodeIfPresent(Double.self, forKey: .glassAmount)
         wheelThickness = try c.decodeIfPresent(Double.self, forKey: .wheelThickness) ?? 66

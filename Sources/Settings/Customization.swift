@@ -18,7 +18,15 @@ struct CustomizationPage: View {
     private var preferences: HaloPreferences {
         get { draft }
         nonmutating set {
-            if store.save(newValue) { draft = newValue }
+            var next = newValue
+            // A wheel can discover positions while Settings is open. Ordinary
+            // controls must not overwrite those silently persisted discoveries.
+            if next.quitterPreferredAngles == draft.quitterPreferredAngles {
+                for (id, angle) in store.value.quitterPreferredAngles where next.quitterPreferredAngles[id] == nil {
+                    next.quitterPreferredAngles[id] = angle
+                }
+            }
+            if store.save(next) { draft = next }
             else { message = "Could not save these settings." }
         }
     }
@@ -33,7 +41,7 @@ struct CustomizationPage: View {
             VStack(alignment: .leading, spacing: 16) {
                 if tab == 1 {
                     HStack(alignment: .top, spacing: 20) {
-                        VStack(alignment: .leading, spacing: 16) {
+                        VStack(alignment: .leading, spacing: 14) {
                             section("Glass") {
                                 HStack { Text("Wheel finish"); Spacer(); Text(preferences.glassTitle).foregroundStyle(.secondary) }
                                 detentedSlider("Wheel glass", value: binding(\.glassLevel),
@@ -83,18 +91,20 @@ struct CustomizationPage: View {
                                 PreviewBackdrop(style: backdrop).allowsHitTesting(false).accessibilityHidden(true)
                                 WheelEditor(preferences: preferencesBinding, quitter: quitter, editable: false,
                                             previewLimit: 388)
-                            }.frame(height: 420).clipShape(RoundedRectangle(cornerRadius: 18))
+                            }.frame(height: 400).clipShape(RoundedRectangle(cornerRadius: 18))
                             SlidingChoiceSwitch(selection: Binding(
                                 get: { PreviewBackdrop.Style.allCases.firstIndex(of: backdrop) ?? 0 },
                                 set: { backdrop = PreviewBackdrop.Style.allCases[$0] }), changed: tick,
                                 labels: PreviewBackdrop.Style.allCases.map(\.rawValue), controlWidth: 280,
                                 accessibilityTitle: "Preview background")
                             previewHapticsControl
-                            Text("Live preview · \(Int(quitter ? preferences.quitterDiameter : preferences.launcherDiameter)) pt")
-                                .font(.caption).foregroundStyle(.secondary)
-                            Text((quitter ? preferences.quitterDiameter : preferences.launcherDiameter) + 56 <= 388
-                                 ? "Actual size · Hover to try selection." : "Scaled to fit · Same proportions as the wheel.")
-                                .font(.caption).foregroundStyle(.tertiary)
+                            VStack(spacing: 4) {
+                                Text("Live preview · \(Int(quitter ? preferences.quitterDiameter : preferences.launcherDiameter)) pt")
+                                    .foregroundStyle(.secondary)
+                                Text((quitter ? preferences.quitterDiameter : preferences.launcherDiameter) + 56 <= 388
+                                     ? "Actual size · Hover to try selection." : "Scaled to fit · Same proportions as the wheel.")
+                                    .foregroundStyle(.tertiary)
+                            }.font(.caption)
                         }.frame(maxWidth: .infinity)
                     }
                 } else if tab == 2 {
@@ -105,57 +115,15 @@ struct CustomizationPage: View {
                         Button(action: addApps) { Label("Add apps…", systemImage: "plus") }
                             .buttonStyle(.glass).disabled(quitter || preferences.launcherTargets.count >= 24)
                     }
-                    WheelEditor(preferences: preferencesBinding, quitter: quitter, editable: true)
-                        .frame(height: 340)
-                    if quitter {
-                        HStack(alignment: .top, spacing: 16) {
-                        section("Per-app quit behavior") {
-                            HStack {
-                                Menu(quitAppID.isEmpty ? "Choose app…" : quitAppName(quitAppID)) {
-                                    ForEach(quitAppIDs, id: \.self) { id in
-                                        Button(quitAppName(id)) { quitAppID = id }
-                                    }
-                                    Divider()
-                                    Button("Choose another app…", action: chooseQuitApp)
-                                }.frame(maxWidth: .infinity, alignment: .leading)
-                                Picker("Quit behavior", selection: Binding(
-                                    get: { preferences.appQuitOverrides[quitAppID].map { $0 ? 2 : 1 } ?? 0 },
-                                    set: { preferences.appQuitOverrides[quitAppID] = $0 == 0 ? nil : $0 == 2 })) {
-                                    Text("Use default").tag(0)
-                                    Text("Quit").tag(1)
-                                    Text("Force quit").tag(2)
-                                }.labelsHidden().frame(width: 170)
-                                    .disabled(quitAppID.isEmpty || quitAppID == "com.apple.finder")
-                            }
-                            Text(quitAppID == "com.apple.finder" ? "Finder always closes its windows." : "Default: \(preferences.forceQuitApps ? "Force quit" : "Quit") · Force quit can lose unsaved changes.")
+                    HStack(alignment: .center, spacing: 20) {
+                        VStack(spacing: 12) {
+                            WheelEditor(preferences: preferencesBinding, quitter: quitter, editable: true,
+                                        previewLimit: 356)
+                                .frame(height: 380)
+                            Text(quitter ? "Preview only · No apps are quit" : "Drag to reorder · Hover × to remove")
                                 .font(.caption).foregroundStyle(.secondary)
-                        }
-                        section("Pinned Trash") {
-                            HStack(alignment: .top, spacing: 12) {
-                                VStack(spacing: 8) {
-                                    Toggle("Show Trash", isOn: binding(\.showsTrash))
-                                    Toggle("Highlight sector", isOn: binding(\.highlightsTrash)).disabled(!preferences.showsTrash)
-                                }.frame(width: 210)
-                                VStack(alignment: .leading, spacing: 8) {
-                                    Text("Position").font(.caption).foregroundStyle(.secondary)
-                                    Picker("Position", selection: binding(\.trashPosition)) {
-                                        ForEach(TrashPosition.allCases, id: \.self) { Text($0.rawValue.capitalized).tag($0) }
-                                    }.labelsHidden().disabled(!preferences.showsTrash)
-                                }.frame(width: 100)
-                                Spacer(minLength: 0)
-                            }
-                        }
-                        }
-                        Text("Running apps arrange automatically. This preview never quits apps or empties Trash.")
-                            .font(.caption).foregroundStyle(.secondary)
-                    } else {
-                        HStack {
-                            Text("Drag to reorder · Hover × to remove").foregroundStyle(.secondary)
-                            Spacer()
-                            Button("Reset apps") {
-                                if confirmReset("Reset launcher apps?") { preferences.launcherTargets = LauncherTarget.original }
-                            }.buttonStyle(.borderless)
-                        }.font(.caption)
+                        }.frame(maxWidth: .infinity).frame(height: 440)
+                        appsOptions.frame(width: 340)
                     }
                 } else {
                     section("Behavior") {
@@ -180,6 +148,65 @@ struct CustomizationPage: View {
         }.frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .font(.system(size: 13)).tint(.white).environment(\.colorScheme, .dark)
         .toggleStyle(HaloToggleStyle())
+    }
+    @ViewBuilder private var appsOptions: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            if quitter {
+                section("Layout") {
+                    Toggle("Stable app positions", isOn: binding(\.stableQuitterPositions))
+                    Text(preferences.stableQuitterPositions
+                         ? "Match Launcher directions and remember other apps. Empty slots stay put until the wheel closes."
+                         : "Space running apps evenly. Remaining apps rearrange when one quits.")
+                        .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                }
+                section("Per-app quit behavior") {
+                    Menu(quitAppID.isEmpty ? "Choose app…" : quitAppName(quitAppID)) {
+                        ForEach(quitAppIDs, id: \.self) { id in
+                            Button(quitAppName(id)) { quitAppID = id }
+                        }
+                        Divider()
+                        Button("Choose another app…", action: chooseQuitApp)
+                    }.frame(maxWidth: .infinity, alignment: .leading)
+                    HStack {
+                        Text("Action")
+                        Spacer()
+                        Picker("Quit behavior", selection: Binding(
+                            get: { preferences.appQuitOverrides[quitAppID].map { $0 ? 2 : 1 } ?? 0 },
+                            set: { preferences.appQuitOverrides[quitAppID] = $0 == 0 ? nil : $0 == 2 })) {
+                            Text("Use default").tag(0)
+                            Text("Quit").tag(1)
+                            Text("Force quit").tag(2)
+                        }.labelsHidden().frame(width: 160)
+                            .disabled(quitAppID.isEmpty || quitAppID == "com.apple.finder")
+                    }
+                    Text(quitAppID == "com.apple.finder" ? "Finder always closes its windows." : "Default: \(preferences.forceQuitApps ? "Force quit" : "Quit") · Force quit can lose unsaved changes.")
+                        .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                }
+                section("Pinned Trash") {
+                    Toggle("Show Trash", isOn: binding(\.showsTrash))
+                    Toggle("Highlight sector", isOn: binding(\.highlightsTrash)).disabled(!preferences.showsTrash)
+                    HStack {
+                        Text("Position")
+                        Spacer()
+                        Picker("Position", selection: binding(\.trashPosition)) {
+                            ForEach(TrashPosition.allCases, id: \.self) { Text($0.rawValue.capitalized).tag($0) }
+                        }.labelsHidden().frame(width: 120).disabled(!preferences.showsTrash)
+                    }
+                }
+            } else {
+                section("Launcher apps") {
+                    Text("\(preferences.launcherTargets.count) of 24 apps").font(.system(size: 14, weight: .medium))
+                    Text("Add apps above, then drag their icons around the wheel to choose their positions.")
+                        .foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                    Text("Hover an icon and click × to remove it from Halo. The app stays on your Mac.")
+                        .foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                    Divider().opacity(0.4)
+                    Button("Reset apps") {
+                        if confirmReset("Reset launcher apps?") { preferences.launcherTargets = LauncherTarget.original }
+                    }.buttonStyle(.borderless).font(.caption)
+                }
+            }
+        }
     }
     private func tintBinding(_ key: WritableKeyPath<HaloPreferences, HaloTint>) -> Binding<Color> {
         Binding(get: { preferences[keyPath: key].color }, set: { preferences[keyPath: key] = HaloTint($0) })
@@ -212,7 +239,7 @@ struct CustomizationPage: View {
         return alert.runModal() == .alertSecondButtonReturn
     }
     private func section<Content: View>(_ title: String, @ViewBuilder content: () -> Content) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: 10) {
             Text(title).font(.system(size: 11, weight: .semibold)).foregroundStyle(.secondary)
             content()
         }.padding(14).frame(maxWidth: .infinity, alignment: .leading)

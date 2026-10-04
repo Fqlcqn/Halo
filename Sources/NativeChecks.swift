@@ -96,6 +96,13 @@ import SwiftUI
         expect(controller.state.layoutSlots == stableSlots, "Live removal retains every Quitter session slot")
         expect(controller.state.selectedIndex(dx: 120, dy: 0) == nil, "An exited app leaves an inert empty direction")
         expect(controller.state.selectedIndex(dx: cos(.pi) * 120, dy: -sin(.pi) * 120) == 2, "Remaining apps do not reindex after a live removal")
+        controller.show(items: Array(items.prefix(4)), geometry: WheelGeometry(quitter: true), center: center, trackMouse: false, instant: true)
+        expect(controller.state.layoutSlots.isEmpty, "Reopening in automatic mode clears stable slots")
+        controller.replaceItems([items[0], items[2], items[3]])
+        for index in controller.state.items.indices {
+            expect(controller.state.angle(for: index) == controller.state.geometry.angle(index: index, count: 3),
+                   "Automatic live removal evenly redistributes the remaining apps")
+        }
         controller.show(items: items, geometry: WheelGeometry(), center: center, trackMouse: false, instant: true)
         controller.select(1)
         expect(controller.takeSelection()?.id == "fixture:1", "Fast selections commit without waiting for reveal animation")
@@ -185,7 +192,24 @@ import SwiftUI
             NSApp.keyWindow?.close()
             localRuntime.engine.update([], at: 12)
         }
-        localRuntime.stop(); driver.stop()
+        localRuntime.stop()
+        for stable in [false, true, false] {
+            var preferences = keyStore.value
+            preferences.stableQuitterPositions = stable
+            preferences.showsTrash = true
+            expect(keyStore.save(preferences), "Quitter layout mode saves")
+            driver.showWheel(.quitter)
+            expect(driver.quitter.state.layoutSlots.isEmpty == !stable,
+                   "Actual coordinator uses fixed slots only when stable layout is enabled")
+            if !stable {
+                for index in driver.quitter.state.items.indices {
+                    expect(driver.quitter.state.angle(for: index) == driver.quitter.state.geometry.angle(index: index, count: driver.quitter.state.items.count),
+                           "Automatic mode returns to evenly spaced angles after disabling stable mode")
+                }
+            }
+            driver.hideWheel(.quitter)
+        }
+        driver.stop()
         controller.hide(immediately: true)
         expect(!window.isVisible && controller.panel?.isVisible == false, "All test windows are closed")
         expect(controller.panel?.isVisible == false, "Hide finishes and removes panel")
