@@ -188,7 +188,7 @@ final class WheelPanel: NSPanel {
     }
     init(store: PreferenceStore, safeMode: Bool) {
         self.store = store; self.actions = ActionService(safeMode: safeMode)
-        self.actions.forceQuitApps = { [weak store] id in store?.value.shouldForceQuit(id) ?? true }
+        self.actions.forceQuitApps = { [weak store] id in store?.value.shouldForceQuit(id) ?? false }
         super.init()
         launcher.safeMode = safeMode; quitter.safeMode = safeMode
         actions.quitStateChanged = { [weak self] in self?.refreshQuitter() }

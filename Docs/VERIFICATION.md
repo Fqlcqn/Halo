@@ -1,5 +1,10 @@
 # Verification record
 
+## October 3, 2026 — 1.2.4 (16)
+
+- Regular Quit is now the global product default. Version 1 preferences migrate to it, while explicit bundle-ID per-app choices remain intact. Force quit remains an opt-in Advanced setting.
+- Automated checks cover fresh defaults, legacy migration, per-app override precedence and JSON persistence. No real app quit, force quit, Finder close, or Trash action is automated.
+
 ## October 3, 2026 — 1.2.3 (15)
 
 - Geometry regression checks exercise repeated full turns in both directions through opposite sectors. Per-app quit rules cover both global defaults, unknown apps, override removal and JSON round trips. Existing Finder disposition checks retain close-windows behavior.

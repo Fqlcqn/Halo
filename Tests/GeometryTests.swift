@@ -166,7 +166,13 @@ import Foundation
         var tintLegacy = try! JSONSerialization.jsonObject(with: JSONEncoder().encode(tinted)) as! [String: Any]
         for key in ["settingsTint", "selectionTint", "forceQuitApps"] { tintLegacy.removeValue(forKey: key) }
         let migratedTint = try! JSONDecoder().decode(HaloPreferences.self, from: JSONSerialization.data(withJSONObject: tintLegacy))
-        expect(migratedTint.settingsTint == .white && migratedTint.selectionTint == .white && migratedTint.forceQuitApps, "Legacy configuration retains white tints and existing force-quit behavior")
+        expect(migratedTint.settingsTint == .white && migratedTint.selectionTint == .white && !migratedTint.forceQuitApps, "Legacy configuration adopts safe regular-quit default")
+        var v1ForceQuit = try! JSONSerialization.jsonObject(with: JSONEncoder().encode(tinted)) as! [String: Any]
+        v1ForceQuit["version"] = 1
+        v1ForceQuit["forceQuitApps"] = true
+        v1ForceQuit["appQuitOverrides"] = ["example.game": true]
+        let migratedV1 = try! JSONDecoder().decode(HaloPreferences.self, from: JSONSerialization.data(withJSONObject: v1ForceQuit))
+        expect(!migratedV1.forceQuitApps && migratedV1.shouldForceQuit("example.game") && !migratedV1.shouldForceQuit("unknown"), "Version 1 force-quit default migrates while explicit per-app rule remains")
         tinted.settingsTint.red = -0.01
         expect(!store.save(tinted), "Invalid settings tint rejected")
         tinted.settingsTint = .white; tinted.selectionTint.blue = .nan

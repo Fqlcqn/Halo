@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.2.4 (16) — safe default for Quitter, 2026-10-03
+
+- Quitter now uses regular Quit by default, allowing apps to save or ask before closing. Advanced → Force quit apps remains available for users who deliberately want force quitting globally.
+- Existing version 1 settings migrate to the new regular-Quit default; explicit per-app Quit/Force quit choices are preserved. Finder continues to close its windows rather than terminating.
+
 ## 1.2.3 (15) — two-item rotation and per-app quitting, 2026-10-03
 
 - Opposite highlight sectors follow the pointer's side of travel, allowing full clockwise and counterclockwise rotations with one app plus Trash. The same geometry is used in previews.

@@ -194,7 +194,9 @@ struct HaloPreferences: Codable, Equatable {
     var previewHaptics = false
     var settingsTint = HaloTint.white
     var selectionTint = HaloTint.white
-    var forceQuitApps = true
+    /// Regular quit is the safe default. Force quit is deliberate, either
+    /// globally through Settings or for an individual app.
+    var forceQuitApps = false
     var appQuitOverrides: [String: Bool] = [:]
     func shouldForceQuit(_ bundleIdentifier: String?) -> Bool {
         bundleIdentifier.flatMap { appQuitOverrides[$0] } ?? forceQuitApps
@@ -212,7 +214,7 @@ struct HaloPreferences: Codable, Equatable {
         if glassLevel == 1 { return "Translucent" }
         return "\(Int((glassLevel * 100).rounded()))% diffusion"
     }
-    var version = 1
+    var version = 2
     var launcherDiameter = 300.0
     var quitterDiameter = 300.0
     var selectionDistance = 86.0
@@ -239,12 +241,18 @@ struct HaloPreferences: Codable, Equatable {
         previewHaptics = try c.decodeIfPresent(Bool.self, forKey: .previewHaptics) ?? false
         settingsTint = try c.decodeIfPresent(HaloTint.self, forKey: .settingsTint) ?? .white
         selectionTint = try c.decodeIfPresent(HaloTint.self, forKey: .selectionTint) ?? .white
-        forceQuitApps = try c.decodeIfPresent(Bool.self, forKey: .forceQuitApps) ?? true
+        let storedVersion = try c.decodeIfPresent(Int.self, forKey: .version) ?? 1
+        // Version 1 used force quit by default. The version 2 product default
+        // is regular quit, so migrate legacy installs to it while retaining
+        // each explicit per-app choice.
+        forceQuitApps = storedVersion >= 2
+            ? (try c.decodeIfPresent(Bool.self, forKey: .forceQuitApps) ?? false)
+            : false
         appQuitOverrides = try c.decodeIfPresent([String: Bool].self, forKey: .appQuitOverrides) ?? [:]
         glassFinish = try c.decodeIfPresent(WheelGlassFinish.self, forKey: .glassFinish) ?? .standard
         glassAmount = try c.decodeIfPresent(Double.self, forKey: .glassAmount)
         wheelThickness = try c.decodeIfPresent(Double.self, forKey: .wheelThickness) ?? 66
-        version = try c.decode(Int.self, forKey: .version)
+        version = 2
         launcherDiameter = try c.decode(Double.self, forKey: .launcherDiameter)
         quitterDiameter = try c.decode(Double.self, forKey: .quitterDiameter)
         selectionDistance = try c.decode(Double.self, forKey: .selectionDistance)
@@ -259,7 +267,7 @@ struct HaloPreferences: Codable, Equatable {
     }
 
     var isValid: Bool {
-        version == 1 && appQuitOverrides.count <= 512 &&
+        version == 2 && appQuitOverrides.count <= 512 &&
         appQuitOverrides.keys.allSatisfy { !$0.isEmpty && $0.count <= 255 } &&
         settingsTint.isValid && selectionTint.isValid &&
         wheelThickness.isFinite && (36...78).contains(wheelThickness) &&

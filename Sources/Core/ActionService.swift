@@ -2,7 +2,7 @@ import AppKit
 
 @MainActor final class ActionService {
     let safeMode: Bool
-    var forceQuitApps: (String?) -> Bool = { _ in true }
+    var forceQuitApps: (String?) -> Bool = { _ in false }
     private(set) var trashPending = false
     private var pending = PendingQuitTracker()
     var quitStateChanged: (() -> Void)?
