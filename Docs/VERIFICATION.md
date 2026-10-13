@@ -1,5 +1,13 @@
 # Verification record
 
+## October 12, 2026 — 1.3.0 (19)
+
+- `make verify` passed: 18,586 geometry/layout/preferences checks and 4,023 native window/lifecycle checks, plus shortcut/runtime suites and harmless Trash simulations. Counts depend on eligible running apps; no real force quit or Empty Trash was performed.
+- New regressions cover disabled Switcher behavior, old shortcut migration, conflicting chords, Left Shift versus generic/right Shift, every ordered pair of wheel handoffs, both release orders at 0–39 ms, Hold/Toggle/menu confirmation, comma/Escape cancellation and live disabling. Unposted events exercise the runtime's left-device Shift flags and Fn-less Settings key snapshots across all three wheels.
+- Native checks verify Switcher catalog/action types, exclusive panel visibility, shared geometry/behavior settings, automatic/stable layouts, cancelled commit behavior and real comma-to-Settings routing. No live application activation is executed by these safe tests.
+- An isolated `--ui-test` session visually verified General off/on, the Fn + Left Shift recorder and Hold/Toggle control, Apps → Switcher with no editing/quit actions, and the Appearance Switcher picker/diameter. Diagnostic app was quit afterward. User preferences were untouched by UI tests.
+- Release/install/package/status verify universal architectures, ad-hoc signatures, the source allowlist and installed bytes. Physical Fn/trackpad interaction, cross-Space/full-screen activation, clean-Mac acceptance, notarization and App Store eligibility remain unverified.
+
 ## October 4, 2026 — 1.2.6 (18)
 
 - `make verify` passed: 18,583 geometry/layout/preferences checks, 3,989 native window/lifecycle checks (including 100 rapid cycles), shortcut/runtime tests and harmless Trash simulations. Native totals can vary with the number of running apps inspected by safe coordinator checks.

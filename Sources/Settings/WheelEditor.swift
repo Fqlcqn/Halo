@@ -5,6 +5,8 @@ import SwiftUI
 struct WheelEditor: View {
     @Binding var preferences: HaloPreferences
     let quitter: Bool
+    var switching = false
+    private var runningWheel: Bool { quitter || switching }
     let editable: Bool
     var previewLimit: Double = 340
     var scalesToLargestWheel = false
@@ -24,7 +26,7 @@ struct WheelEditor: View {
             ZStack {
                 WheelView(state: state, showsIcons: false)
                 if state.items.isEmpty {
-                    Text(quitter ? "No running apps" : "Add your first app")
+                    Text(runningWheel ? "No running apps" : "Add your first app")
                         .font(.callout).foregroundStyle(.secondary)
                 }
                 ForEach(state.items) { item in
@@ -39,13 +41,13 @@ struct WheelEditor: View {
                 switch phase {
                 case .active(let point):
                     let active = state.items.firstIndex { $0.id == hovered }
-                    let hit = quitter
+                    let hit = runningWheel
                         ? state.selectedIndex(dx: point.x - state.geometry.panelSize / 2,
                                               dy: state.geometry.panelSize / 2 - point.y)
                         : state.geometry.editorHit(at: point, count: state.items.count,
                             selected: state.selected, lift: state.motion.lift, active: active)
                     hovered = hit.map { state.items[$0].id }
-                    select(at: point, override: editable && !quitter ? hit : nil)
+                    select(at: point, override: editable && !runningWheel ? hit : nil)
                 case .ended: state.selected = nil; hovered = nil
                 }
             }
@@ -53,7 +55,7 @@ struct WheelEditor: View {
             .frame(width: state.geometry.panelSize * scale, height: state.geometry.panelSize * scale)
             .frame(maxWidth: .infinity)
             .animation(animation, value: state.geometry.diameter)
-            if editable && !quitter && !missing.isEmpty {
+            if editable && !runningWheel && !missing.isEmpty {
                 HStack {
                     Text("\(missing.count) unavailable").font(.caption).foregroundStyle(.secondary)
                     Spacer()
@@ -67,9 +69,10 @@ struct WheelEditor: View {
         }
         .onAppear { refresh() }
         .onChange(of: preferences) { _, _ in refresh() }
+        .onChange(of: switching) { _, _ in dragging = nil; dragPoint = nil; refresh() }
         .onChange(of: quitter) { _, _ in dragging = nil; dragPoint = nil; refresh() }
-        .onReceive(NSWorkspace.shared.notificationCenter.publisher(for: NSWorkspace.didLaunchApplicationNotification)) { _ in if quitter { refresh() } }
-        .onReceive(NSWorkspace.shared.notificationCenter.publisher(for: NSWorkspace.didTerminateApplicationNotification)) { _ in if quitter { refresh() } }
+        .onReceive(NSWorkspace.shared.notificationCenter.publisher(for: NSWorkspace.didLaunchApplicationNotification)) { _ in if runningWheel { refresh() } }
+        .onReceive(NSWorkspace.shared.notificationCenter.publisher(for: NSWorkspace.didTerminateApplicationNotification)) { _ in if runningWheel { refresh() } }
         .onDisappear { catalog.stop() }
     }
     private func editorIcon(_ item: WheelItem) -> some View {
@@ -81,7 +84,7 @@ struct WheelEditor: View {
         return IconTile(item: item, selected: hovered == item.id || dragging == item.id, size: geometry.itemSize(count: state.items.count))
             .contentShape(Rectangle())
             .overlay(alignment: .topTrailing) {
-                if editable && !quitter {
+                if editable && !runningWheel {
                     Button { remove(item.id) } label: {
                         Image(systemName: "xmark").font(.system(size: 9, weight: .bold))
                             .frame(width: 20, height: 20)
@@ -97,7 +100,7 @@ struct WheelEditor: View {
             .onTapGesture { hovered = item.id }
             .gesture(DragGesture(minimumDistance: 5, coordinateSpace: .named("wheel-editor"))
                 .onChanged { value in
-                    guard editable && !quitter else { return }
+                    guard editable && !runningWheel else { return }
                     dragging = item.id; dragPoint = value.location
                     let dx = value.location.x - geometry.panelSize / 2
                     let dy = geometry.panelSize / 2 - value.location.y
@@ -108,14 +111,14 @@ struct WheelEditor: View {
                 }
                 .onEnded { _ in withAnimation(animation) { dragging = nil; dragPoint = nil } })
             .contextMenu {
-                if editable && !quitter {
+                if editable && !runningWheel {
                     Button("Move clockwise") { move(item.id, by: 1) }
                     Button("Move counterclockwise") { move(item.id, by: -1) }
                     Button("Remove from wheel") { remove(item.id) }
                 }
             }
             .accessibilityActions {
-                if editable && !quitter {
+                if editable && !runningWheel {
                     Button("Remove from wheel") { remove(item.id) }
                     Button("Move clockwise") { move(item.id, by: 1) }
                 }
@@ -141,17 +144,17 @@ struct WheelEditor: View {
         state.selected = index
     }
     private func refresh() {
-        state.geometry = WheelGeometry(diameter: quitter ? preferences.quitterDiameter : preferences.launcherDiameter,
+        state.geometry = WheelGeometry(diameter: switching ? preferences.switcherDiameter : quitter ? preferences.quitterDiameter : preferences.launcherDiameter,
             selectionDistance: preferences.selectionDistance, maximumSelectionDistance: preferences.maximumSelectionDistance,
             quitter: quitter, trashPosition: preferences.trashPosition, thickness: preferences.wheelThickness)
         state.glassFinish = preferences.glassFinish; state.highlightsTrash = preferences.highlightsTrash
         state.glassAmount = preferences.glassAmount
         state.selectionTint = preferences.selectionTint
         state.revealed = true; state.selected = nil
-        let items = quitter ? catalog.quitter(showsTrash: preferences.showsTrash) : catalog.launcher(targets: preferences.launcherTargets)
+        let items = switching ? catalog.switcher() : quitter ? catalog.quitter(showsTrash: preferences.showsTrash) : catalog.launcher(targets: preferences.launcherTargets)
         withAnimation(animation) {
-            state.layoutSlots = quitter && preferences.stableQuitterPositions
-                ? WheelCoordinator.stableLayout(items: items, preferences: preferences, geometry: state.geometry).slots : []
+            state.layoutSlots = (switching && preferences.stableSwitcherPositions) || (quitter && preferences.stableQuitterPositions)
+                ? WheelCoordinator.stableLayout(items: items, preferences: preferences, geometry: state.geometry, switching: switching).slots : []
             state.items = items
         }
     }

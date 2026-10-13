@@ -154,7 +154,8 @@ import SwiftUI
         window.orderOut(nil); settings.present()
         expect(window.frame.origin == moved, "Reopening Settings preserves its dragged position")
         window.close()
-        for chord in [runtime.engine.config.launcher!, runtime.engine.config.quitter!] {
+        runtime.engine.config.switcherEnabled = true
+        for chord in [runtime.engine.config.launcher!, runtime.engine.config.quitter!, runtime.engine.config.switcher!] {
             runtime.engine.update([], at: 1)
             runtime.engine.update(chord, at: 2)
             await settle()
@@ -174,9 +175,11 @@ import SwiftUI
         let localRuntime = HaloRuntime(driver: driver, defaults: defaults)!
         driver.launcher.onKeyEvent = { localRuntime.handleWheelKeyEvent($0) }
         driver.quitter.onKeyEvent = { localRuntime.handleWheelKeyEvent($0) }
-        for wheel in [HaloWheel.launcher, HaloWheel.quitter] {
+        driver.switcher.onKeyEvent = { localRuntime.handleWheelKeyEvent($0) }
+        localRuntime.engine.config.switcherEnabled = true
+        for wheel in [HaloWheel.launcher, HaloWheel.quitter, HaloWheel.switcher] {
             localRuntime.engine.update([], at: 10)
-            let chord = wheel == .launcher ? localRuntime.engine.config.launcher! : localRuntime.engine.config.quitter!
+            let chord = localRuntime.engine.config.chord(for: wheel)! as! Set<NSNumber>
             localRuntime.engine.update(chord, at: 11)
             await settle()
             let keyPanel = driver.controller(wheel).panel as! WheelPanel
@@ -208,6 +211,33 @@ import SwiftUI
                 }
             }
             driver.hideWheel(.quitter)
+        }
+        var switcherPreferences = keyStore.value
+        switcherPreferences.switcherDiameter = 410; switcherPreferences.lessAnimation = true
+        switcherPreferences.haptics = false; switcherPreferences.dynamicIconMovement = true
+        switcherPreferences.selectionDistance = 60; switcherPreferences.maximumSelectionDistance = 500
+        switcherPreferences.glassAmount = 0.7; switcherPreferences.wheelThickness = 48
+        expect(keyStore.save(switcherPreferences), "Switcher appearance fixture saves")
+        for stable in [false, true, false] {
+            switcherPreferences.stableSwitcherPositions = stable
+            expect(keyStore.save(switcherPreferences), "Switcher layout saves")
+            driver.showWheel(.launcher); driver.showWheel(.quitter); driver.showWheel(.switcher)
+            let state = driver.switcher.state
+            expect(driver.launcher.panel?.isVisible == false && driver.quitter.panel?.isVisible == false,
+                   "Switcher exclusively owns visible wheel")
+            expect(state.geometry.diameter == 410 && state.geometry.selectionDistance == 60 && state.geometry.maximumSelectionDistance == 500,
+                   "Switcher uses customized geometry")
+            expect(state.instantTransitions && !driver.switcher.haptics && driver.switcher.dynamicIconMovement && state.glassAmount == 0.7,
+                   "Shared behavior and appearance apply to Switcher")
+            let expectedPIDs = Set(driver.catalog.quitter(showsTrash: false).map(\.id))
+            expect(Set(state.items.map(\.id)) == expectedPIDs, "Switcher contains all eligible running apps without Trash")
+            for item in state.items {
+                if case .activate(let app) = item.action { expect(!app.isTerminated, "Switcher activates a live process") }
+                else { expect(false, "Switcher cannot launch, quit or empty Trash") }
+            }
+            expect(state.items.isEmpty || state.layoutSlots.isEmpty == !stable, "Switcher supports both layout modes")
+            driver.hideWheel(.switcher)
+            expect(driver.switcher.takeSelection() == nil, "Hidden Switcher cannot commit")
         }
         driver.stop()
         controller.hide(immediately: true)

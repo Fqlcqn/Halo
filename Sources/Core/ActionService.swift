@@ -51,6 +51,10 @@ import AppKit
                 application?.activate(options: [.activateAllWindows])
                 if let error { Task { @MainActor in Self.report("Could not open \(item.name)", detail: error.localizedDescription) } }
             }
+        case .activate(let application):
+            // A stale selection must never relaunch an app that has exited.
+            guard !application.isTerminated else { return }
+            application.activate(options: [.activateAllWindows])
         case .quit(let application):
             guard !application.isTerminated else { return }
             if !pendingQuitIDs.contains(application.processIdentifier) { prepare(item) }

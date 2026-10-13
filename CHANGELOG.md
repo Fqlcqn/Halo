@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.3.0 (19) — Switcher wheel, 2026-10-12
+
+- Added an opt-in Switcher wheel for running apps. Selection activates the exact running process with all windows, like Launcher, without launching a stopped app or exposing Quit/Trash actions. Running-app changes refresh the wheel.
+- General includes Enable Switcher wheel and a matching shortcut recorder with Hold/Toggle modes, defaulting to Fn + Left Shift. The menu-bar entry follows the toggle. Left Shift is distinguished while existing side-independent Shift shortcuts remain compatible.
+- Extended the shared input engine to three wheels, preserving release-to-select, exactly-once handoffs, the 40 ms subset-release guard, Escape/comma handling, recording suspension, and queued-session cancellation. Existing shortcuts migrate unchanged.
+- Switcher shares appearance, selection, animation and haptic settings, with its own diameter, previews and optional stable positions. Its customizations persist, export and import alongside existing wheel preferences.
+- Verified shortcut/runtime regressions, 18,586 geometry/layout/preferences checks and 4,023 native checks. Inspected the enabled General controls and both preview pages in an isolated safe session. Physical Fn/trackpad feel and cross-Space activation still require manual acceptance.
+
 ## 1.2.6 (18) — optional stable layout and compact Settings, 2026-10-04
 
 - Restored evenly spaced, automatically rearranging Quitter apps as the default, including for existing settings. Apps → Quitter → Stable app positions enables the remembered-direction layout; switching it off preserves remembered positions for later use. Quit, Force Quit, Finder and Trash actions are unchanged.

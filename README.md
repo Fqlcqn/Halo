@@ -2,7 +2,7 @@
 
 Hold. Point. Release.
 
-A customizable Liquid Glass app launcher and quitter for macOS.
+A customizable Liquid Glass app launcher, switcher, and quitter for macOS.
 Made by **Maneesh Getni**.
 
 Hold a shortcut, point at an app, and release. Open apps, bring running apps'
@@ -11,7 +11,7 @@ shortcuts, animation, and haptics.
 
 ## Install
 
-Requires **macOS 26+**, Apple silicon or Intel. Download `Halo-1.2.6-macOS.zip`
+Requires **macOS 26+**, Apple silicon or Intel. Download `Halo-1.3.0-macOS.zip`
 from this repository's Releases, unzip, move Halo.app to Applications, and open
 it. Quit older Halo copies first. There is no account, subscription, telemetry,
 or automatic updater.
@@ -31,12 +31,30 @@ menu-bar icon always provides access, even without shortcut permissions.
    Accessibility to enable global shortcuts. Quit and reopen Halo if needed.
 2. Hold **Fn / Globe** for Launcher or **Fn + Control** for Quitter. Point at an
    app and release to act. Release in the center or press Escape to cancel.
-   Press **comma** while either wheel is visible to open Settings.
+   Press **comma** while any wheel is visible to open Settings.
 3. In Apps, add .app bundles, drag icons to reorder, and hover × to remove.
    Switching wheels commits the departing selection: keep the pointer centered
    to switch without acting.
 4. If Globe triggers an unwanted system action, change its action in macOS
    Keyboard settings or record different shortcuts in Halo → General.
+
+Enable **General → Enable Switcher wheel** to add a running-app switcher.
+Its default shortcut is **Fn + Left Shift**; record a different chord or choose
+Hold/Toggle in the shortcut card that appears. Select an app to bring all its
+windows forward, using the same activation behavior as Launcher. Switcher never
+launches a stopped app. Right Shift does not trigger its default shortcut.
+It lists the same regular running apps as Quitter, including Finder and hidden
+apps, without Trash or background helpers. The frontmost app comes first, followed
+by app name. The list updates when apps open or close.
+
+Switcher shares glass, tint, thickness, selection reach/dead zone, pointer motion,
+animation and wheel haptics. Appearance has a separate Switcher diameter; both
+preview pages include it. Apps → Switcher offers its own **Stable app positions**
+option, which remembers directions and holds empty slots until the wheel closes.
+In stable mode, newly opened apps appear the next time the wheel opens.
+Quit and Trash settings apply only to Quitter. Existing settings are preserved;
+Switcher is off until enabled. All three wheels retain the same handoff behavior:
+switching commits the departing selection, so stay centered to switch without acting.
 
 Quitter shows running apps. **Regular Quit is the default**, so apps can save or
 ask before closing. Turn on Force quit apps in Advanced only when you want it

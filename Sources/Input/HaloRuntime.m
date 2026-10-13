@@ -1,6 +1,7 @@
 #import "HaloSettings.h"
 #import <ApplicationServices/ApplicationServices.h>
 #import <Carbon/Carbon.h>
+#import <IOKit/hidsystem/IOLLEvent.h>
 static const int64_t HaloReplayTag=0x48414c4f5245504c;
 
 BOOL HaloIsModifierCode(NSInteger code) { return code>=54 && code<=63 && code!=57; }
@@ -9,12 +10,15 @@ NSSet *HaloModifierKeys(CGEventFlags flags) {
     if (flags&kCGEventFlagMaskSecondaryFn) [keys addObject:@(HaloFn)];
     if (flags&kCGEventFlagMaskControl) [keys addObject:@(HaloControl)];
     if (flags&kCGEventFlagMaskAlternate) [keys addObject:@(HaloOption)];
-    if (flags&kCGEventFlagMaskShift) [keys addObject:@(HaloShift)];
+    if (flags&kCGEventFlagMaskShift) {
+        if (flags&NX_DEVICELSHIFTKEYMASK) [keys addObject:@(HaloLeftShift)];
+        if (!(flags&NX_DEVICELSHIFTKEYMASK) || (flags&NX_DEVICERSHIFTKEYMASK)) [keys addObject:@(HaloShift)];
+    }
     if (flags&kCGEventFlagMaskCommand) [keys addObject:@(HaloCommand)];
     return keys;
 }
 NSString *HaloKeyName(NSInteger key) {
-    NSDictionary *names=@{@(HaloFn):@"fn",@(HaloControl):@"⌃",@(HaloOption):@"⌥",@(HaloShift):@"⇧",@(HaloCommand):@"⌘",@36:@"↩",@48:@"⇥",@49:@"Space",@51:@"⌫",@53:@"Esc",@117:@"⌦",@123:@"←",@124:@"→",@125:@"↓",@126:@"↑",@115:@"Home",@119:@"End",@116:@"Pg Up",@121:@"Pg Dn",@71:@"Clear",@76:@"Enter",@122:@"F1",@120:@"F2",@99:@"F3",@118:@"F4",@96:@"F5",@97:@"F6",@98:@"F7",@100:@"F8",@101:@"F9",@109:@"F10",@103:@"F11",@111:@"F12",@105:@"F13",@107:@"F14",@113:@"F15",@106:@"F16",@64:@"F17",@79:@"F18",@80:@"F19",@90:@"F20"};
+    NSDictionary *names=@{@(HaloLeftShift):@"Left ⇧",@(HaloFn):@"fn",@(HaloControl):@"⌃",@(HaloOption):@"⌥",@(HaloShift):@"⇧",@(HaloCommand):@"⌘",@36:@"↩",@48:@"⇥",@49:@"Space",@51:@"⌫",@53:@"Esc",@117:@"⌦",@123:@"←",@124:@"→",@125:@"↓",@126:@"↑",@115:@"Home",@119:@"End",@116:@"Pg Up",@121:@"Pg Dn",@71:@"Clear",@76:@"Enter",@122:@"F1",@120:@"F2",@99:@"F3",@118:@"F4",@96:@"F5",@97:@"F6",@98:@"F7",@100:@"F8",@101:@"F9",@109:@"F10",@103:@"F11",@111:@"F12",@105:@"F13",@107:@"F14",@113:@"F15",@106:@"F16",@64:@"F17",@79:@"F18",@80:@"F19",@90:@"F20"};
     if (names[@(key)]) return names[@(key)];
     TISInputSourceRef source=TISCopyCurrentKeyboardLayoutInputSource();
     CFDataRef data=source?TISGetInputSourceProperty(source,kTISPropertyUnicodeKeyLayoutData):NULL;
@@ -29,7 +33,7 @@ NSString *HaloKeyName(NSInteger key) {
 }
 NSString *HaloChordName(NSSet *keys) {
     NSMutableArray *parts=[NSMutableArray new];
-    for (NSNumber *k in @[@(HaloFn),@(HaloControl),@(HaloOption),@(HaloShift),@(HaloCommand)]) if ([keys containsObject:k]) [parts addObject:HaloKeyName(k.integerValue)];
+    for (NSNumber *k in @[@(HaloFn),@(HaloControl),@(HaloOption),@(HaloShift),@(HaloLeftShift),@(HaloCommand)]) if ([keys containsObject:k]) [parts addObject:HaloKeyName(k.integerValue)];
     for (NSNumber *k in HaloSorted(keys)) if (k.integerValue<HaloFn) [parts addObject:HaloKeyName(k.integerValue)];
     return [parts componentsJoinedByString:@"  +  "];
 }
@@ -51,11 +55,11 @@ static CGEventRef inputCallback(__unused CGEventTapProxy proxy, CGEventType type
     NSMutableSet *_regularHeld, *_swallowed;
     NSMutableArray *_buffer;
     pid_t _bufferPID;
-    BOOL _passthrough, _mouseCaptured, _presented[2], _settingsKeyDown;
+    BOOL _passthrough, _mouseCaptured, _presented[3], _settingsKeyDown;
     NSUInteger _pendingTicket, _actionGeneration;
-    NSUInteger _showTickets[2], _presentedTickets[2];
+    NSUInteger _showTickets[3], _presentedTickets[3];
     HaloSettingsController *_settings;
-    NSMenuItem *_launcherItem, *_quitterItem, *_settingsItem;
+    NSMenuItem *_launcherItem, *_quitterItem, *_switcherItem, *_settingsItem;
     id _localFallback, _globalFallback;
 }
 - (instancetype)initWithDriver:(id<HaloWheelDriver>)driver defaults:(NSUserDefaults *)defaults {
@@ -70,7 +74,7 @@ static CGEventRef inputCallback(__unused CGEventTapProxy proxy, CGEventType type
             // Keep event-tap work bounded; native window work happens after the callback.
             HaloRuntime *owner=weak;
             NSUInteger generation=owner ? owner->_actionGeneration : 0;
-            BOOL isWheel=wheel>=HaloLauncher && wheel<=HaloQuitter;
+            BOOL isWheel=wheel>=HaloLauncher && wheel<=HaloSwitcher;
             NSUInteger session=0;
             if (owner && isWheel) {
                 if ([action isEqual:@"show"]) ++owner->_showTickets[wheel-1];
@@ -95,6 +99,7 @@ static CGEventRef inputCallback(__unused CGEventTapProxy proxy, CGEventType type
     NSMenu *menu=[NSMenu new];
     _launcherItem=[menu addItemWithTitle:@"Open Launcher" action:@selector(menuLauncher:) keyEquivalent:@""]; _launcherItem.target=self;
     _quitterItem=[menu addItemWithTitle:@"Open Quitter" action:@selector(menuQuitter:) keyEquivalent:@""]; _quitterItem.target=self;
+    _switcherItem=[menu addItemWithTitle:@"Open Switcher" action:@selector(menuSwitcher:) keyEquivalent:@""]; _switcherItem.target=self;
     [menu addItem:NSMenuItem.separatorItem];
     _settingsItem=[menu addItemWithTitle:@"Settings…" action:@selector(showSettings:) keyEquivalent:@""]; _settingsItem.target=self;
     [menu addItem:NSMenuItem.separatorItem];
@@ -110,6 +115,8 @@ static CGEventRef inputCallback(__unused CGEventTapProxy proxy, CGEventType type
     [_appObservers addObject:[NSNotificationCenter.defaultCenter addObserverForName:NSApplicationDidBecomeActiveNotification object:nil queue:NSOperationQueue.mainQueue usingBlock:^(__unused NSNotification *note) { if (!weak.inputReady) [weak retryInput]; }]];
 }
 - (void)updateMenu {
+    _switcherItem.hidden=!self.engine.config.switcherEnabled;
+    _switcherItem.title=[@"Open Switcher   " stringByAppendingString:HaloChordName(self.engine.config.switcher)];
     _launcherItem.title=[@"Open Launcher   " stringByAppendingString:HaloChordName(self.engine.config.launcher)];
     _quitterItem.title=[@"Open Quitter   " stringByAppendingString:HaloChordName(self.engine.config.quitter)];
     _settingsItem.title=[NSString stringWithFormat:@"Settings…   %@  +  %@",HaloChordName(self.engine.config.launcher),HaloKeyName(self.engine.config.settingsKey)];
@@ -141,7 +148,7 @@ static CGEventRef inputCallback(__unused CGEventTapProxy proxy, CGEventType type
 }
 - (void)apply:(NSString *)action wheel:(HaloWheel)wheel {
     if ([action isEqual:@"settings"]) { [self showSettings:nil]; return; }
-    if (!self.bridgeReady || wheel<HaloLauncher || wheel>HaloQuitter) return;
+    if (!self.bridgeReady || wheel<HaloLauncher || wheel>HaloSwitcher) return;
     if ([action isEqual:@"show"]) {
         // A fast press/release may have completed before the main queue gets here.
         // Skipping that stale reveal is what keeps shortcut spamming flicker-free.
@@ -171,7 +178,7 @@ static CGEventRef inputCallback(__unused CGEventTapProxy proxy, CGEventType type
     ++_pendingTicket;
     if (recordInput && self.bridgeReady) {
         // Cancel queued/native selections before the first recorded key arrives.
-        for (HaloWheel w=HaloLauncher;w<=HaloQuitter;w++) {
+        for (HaloWheel w=HaloLauncher;w<=HaloSwitcher;w++) {
             _presented[w-1]=NO;
             [_driver hideWheel:w];
         }
@@ -183,6 +190,7 @@ static CGEventRef inputCallback(__unused CGEventTapProxy proxy, CGEventType type
     [_settings present];
 }
 - (void)menuLauncher:(id)sender { [self.engine menuOpen:HaloLauncher]; }
+- (void)menuSwitcher:(id)sender { [self.engine menuOpen:HaloSwitcher]; }
 - (void)menuQuitter:(id)sender { [self.engine menuOpen:HaloQuitter]; }
 - (void)quit:(id)sender { [self cancel]; [NSApp terminate:nil]; }
 - (void)saveConfig:(HaloShortcutConfig *)config {
@@ -230,7 +238,7 @@ static CGEventRef inputCallback(__unused CGEventTapProxy proxy, CGEventType type
         HaloWheel active=self.engine.active;
         if (type==kCGEventLeftMouseDown && active && !self.engine.suspended) {
             // Clicking selects in toggle/menu sessions; hold mode remains release-to-select.
-            BOOL toggle=active==HaloLauncher?self.engine.config.launcherToggle:self.engine.config.quitterToggle;
+            BOOL toggle=[self.engine.config toggleForWheel:active];
             if (toggle || !self.engine.held.count) {
                 NSRect frame=[_driver frameForWheel:active];
                 if (!NSIsEmptyRect(frame) && NSPointInRect(NSEvent.mouseLocation,frame)) _mouseCaptured=YES;
@@ -248,7 +256,7 @@ static CGEventRef inputCallback(__unused CGEventTapProxy proxy, CGEventType type
     // this key event's modifier snapshot (Fn flags can vary on ordinary keys).
     // Swallow the whole key pair so comma never reaches the previous app.
     if (!self.engine.suspended && down && code==self.engine.config.settingsKey &&
-        (self.engine.active || _presented[0] || _presented[1])) {
+        (self.engine.active || _presented[0] || _presented[1] || _presented[2])) {
         if (!_settingsKeyDown) {
             _settingsKeyDown=YES;
             [self.engine openSettings];
@@ -291,7 +299,11 @@ static CGEventRef inputCallback(__unused CGEventTapProxy proxy, CGEventType type
     }
     if (swallowedUp) { if (!held.count) _passthrough=NO; return NULL; }
     if (!held.count) _passthrough=NO;
-    BOOL prefix=held.count && ([held isSubsetOfSet:self.engine.config.launcher] || [held isSubsetOfSet:self.engine.config.quitter]);
+    BOOL prefix=NO;
+    for (HaloWheel w=HaloLauncher;w<=HaloSwitcher;w++) {
+        if (w==HaloSwitcher && !self.engine.config.switcherEnabled) continue;
+        if (held.count && HaloChordMatches(held,[self.engine.config chordForWheel:w],NO)) prefix=YES;
+    }
     if (self.inputReady && !_passthrough && down && prefix) {
         pid_t pid=NSWorkspace.sharedWorkspace.frontmostApplication.processIdentifier;
         if (_buffer.count && (pid!=_bufferPID || _buffer.count>=128)) { [self flushBuffer]; _passthrough=YES; return event; }
@@ -309,7 +321,7 @@ static CGEventRef inputCallback(__unused CGEventTapProxy proxy, CGEventType type
 - (void)stop {
     ++_actionGeneration; ++_pendingTicket;
     [self resetInput];
-    for (HaloWheel wheel=HaloLauncher;wheel<=HaloQuitter;wheel++) [_driver hideWheel:wheel];
+    for (HaloWheel wheel=HaloLauncher;wheel<=HaloSwitcher;wheel++) [_driver hideWheel:wheel];
     _monitorInput=NO;
     if (_tap) { CGEventTapEnable(_tap,false); CFMachPortInvalidate(_tap); CFRelease(_tap); _tap=NULL; }
     if (_tapSource) { CFRunLoopRemoveSource(CFRunLoopGetMain(),_tapSource,kCFRunLoopCommonModes); CFRelease(_tapSource); _tapSource=NULL; }

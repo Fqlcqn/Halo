@@ -78,6 +78,7 @@ import AppKit
         runtime = input
         coordinator.launcher.onKeyEvent = { [weak input] in input?.handleWheelKeyEvent($0) ?? false }
         coordinator.quitter.onKeyEvent = { [weak input] in input?.handleWheelKeyEvent($0) ?? false }
+        coordinator.switcher.onKeyEvent = { [weak input] in input?.handleWheelKeyEvent($0) ?? false }
         input.connect(with: item, monitorInput: !safe)
         coordinator.launcher.onAccessibilitySelect = { [weak coordinator] index in
             guard let coordinator, coordinator.launcher.state.items.indices.contains(index) else { return }
@@ -87,16 +88,21 @@ import AppKit
             guard let coordinator, coordinator.quitter.state.items.indices.contains(index) else { return }
             coordinator.quitter.hide(); coordinator.actions.perform(coordinator.quitter.state.items[index])
         }
+        coordinator.switcher.onAccessibilitySelect = { [weak coordinator, weak input] index in
+            guard let coordinator, coordinator.switcher.state.items.indices.contains(index) else { return }
+            let item = coordinator.switcher.state.items[index]
+            input?.cancel(); coordinator.switcher.hide(); coordinator.actions.perform(item)
+        }
         store.onChange = { [weak input, weak coordinator] in
-            input?.cancel(); coordinator?.launcher.hide(); coordinator?.quitter.hide()
+            input?.cancel(); coordinator?.launcher.hide(); coordinator?.quitter.hide(); coordinator?.switcher.hide()
         }
         if preview {
             let kind = argument("--preview") ?? "launcher"
-            let c = kind == "quitter" ? coordinator.quitter : coordinator.launcher
+            let c = kind == "switcher" ? coordinator.switcher : kind == "quitter" ? coordinator.quitter : coordinator.launcher
             c.state.glassFinish = argument("--glass").flatMap(Int.init).flatMap(WheelGlassFinish.init(rawValue:)) ?? store.value.glassFinish
             c.state.glassAmount = store.value.glassAmount
             let center = NSScreen.main.map { CGPoint(x: $0.frame.midX, y: $0.frame.midY) } ?? .zero
-            c.show(items: kind == "quitter" ? coordinator.catalog.quitter() : coordinator.catalog.launcher(targets: store.value.launcherTargets), geometry: WheelGeometry(diameter: kind == "quitter" ? store.value.quitterDiameter : store.value.launcherDiameter, selectionDistance: store.value.selectionDistance, maximumSelectionDistance: store.value.maximumSelectionDistance, quitter: kind == "quitter", trashPosition: store.value.trashPosition, thickness: store.value.wheelThickness), center: center, trackMouse: false)
+            c.show(items: kind == "switcher" ? coordinator.catalog.switcher() : kind == "quitter" ? coordinator.catalog.quitter() : coordinator.catalog.launcher(targets: store.value.launcherTargets), geometry: WheelGeometry(diameter: kind == "switcher" ? store.value.switcherDiameter : kind == "quitter" ? store.value.quitterDiameter : store.value.launcherDiameter, selectionDistance: store.value.selectionDistance, maximumSelectionDistance: store.value.maximumSelectionDistance, quitter: kind == "quitter", trashPosition: store.value.trashPosition, thickness: store.value.wheelThickness), center: center, trackMouse: false)
             if let selection = argument("--selection").flatMap(Int.init) { c.select(selection) }
             if let fixture = argument("--fixture-background"), let background = NSImage(contentsOfFile: fixture) {
                 let x = argument("--fixture-x").flatMap(Double.init) ?? 959

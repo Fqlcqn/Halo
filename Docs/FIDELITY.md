@@ -2,6 +2,24 @@
 
 Reference: Halo 0.2.1 (6), copied from the former hybrid project's `Latest/Halo.app` at reconstruction time. That historical project is now Halo Legacy; its baseline is preserved separately. Current Halo is entirely source-built. Historical provenance and baseline hashes are in `VERIFICATION.md`. The complete original Swift source was **not** recovered; this is a reconstruction from public API behavior, executable inspection, and visual evidence.
 
+## Switcher extension (1.3.0)
+
+Switcher uses the production wheel renderer, Launcher angular origin and app
+activation behavior. It takes Quitter's regular running-app catalog without
+Trash, but retains the exact process for activation so a terminated selection
+cannot relaunch. General enables it with Fn + Left Shift by default, including
+Hold/Toggle and custom recording. Existing Shift shortcuts keep matching either
+side; the new default specifically requires Left Shift. It is disabled on migration.
+Shared appearance/behavior controls apply, with independent diameter and stable
+layout preferences. Stable Switcher positions follow the same session rules as
+Quitter. This is a new feature, not historical reference behavior.
+
+Manual acceptance: enable Switcher; try Left versus Right Shift, both modifier
+release orders, Hold/Toggle, all three wheel handoffs, comma/Escape, and hidden
+apps/windows across Spaces and full-screen displays. Test live app open/exit
+refresh and disabling/re-enabling. Automated checks do not establish physical
+shortcut, haptic, or cross-Space activation acceptance.
+
 ## Measured/recovered constants
 
 Version 1.2.6 restores symmetric Quitter reflow by default and makes the 1.2.5

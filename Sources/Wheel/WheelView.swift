@@ -2,7 +2,7 @@ import AppKit
 import SwiftUI
 
 struct WheelItem: Identifiable {
-    enum Action { case launch(URL, bundleIdentifier: String), quit(NSRunningApplication), emptyTrash }
+    enum Action { case launch(URL, bundleIdentifier: String), quit(NSRunningApplication), activate(NSRunningApplication), emptyTrash }
     let id: String
     let name: String
     let icon: NSImage?
@@ -10,7 +10,8 @@ struct WheelItem: Identifiable {
     /// The persistent app identity used by Quitter layout. Bundle IDs take
     /// priority; URL keys only support apps that do not supply one.
     var stableIdentifier: String? {
-        guard case .quit(let app) = action else { return nil }
+        let app: NSRunningApplication
+        switch action { case .quit(let running), .activate(let running): app = running; default: return nil }
         if let identifier = app.bundleIdentifier, !identifier.isEmpty { return identifier }
         if let url = app.bundleURL ?? app.executableURL {
             return "url:\(url.standardizedFileURL.resolvingSymlinksInPath().path)"

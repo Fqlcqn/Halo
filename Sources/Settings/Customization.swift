@@ -7,7 +7,11 @@ struct CustomizationPage: View {
     let store: PreferenceStore
     @State private var draft: HaloPreferences
     @State private var message = ""
-    @State private var quitter = false
+    @State private var wheel = 0
+    private var quitter: Bool { wheel == 1 }
+    private var switching: Bool { wheel == 2 }
+    private var runningWheel: Bool { wheel != 0 }
+    private var diameter: Double { switching ? preferences.switcherDiameter : quitter ? preferences.quitterDiameter : preferences.launcherDiameter }
     @State private var quitAppID = ""
     @State private var backdrop = PreviewBackdrop.Style.color
     init(tab: Int, store: PreferenceStore) {
@@ -21,6 +25,9 @@ struct CustomizationPage: View {
             var next = newValue
             // A wheel can discover positions while Settings is open. Ordinary
             // controls must not overwrite those silently persisted discoveries.
+            if next.switcherPreferredAngles == draft.switcherPreferredAngles {
+                next.switcherPreferredAngles = store.value.switcherPreferredAngles
+            }
             if next.quitterPreferredAngles == draft.quitterPreferredAngles {
                 for (id, angle) in store.value.quitterPreferredAngles where next.quitterPreferredAngles[id] == nil {
                     next.quitterPreferredAngles[id] = angle
@@ -59,6 +66,7 @@ struct CustomizationPage: View {
                             section("Size & selection") {
                                 sizeControl("Launcher diameter", value: binding(\.launcherDiameter), stops: .diameter)
                                 sizeControl("Quitter diameter", value: binding(\.quitterDiameter), stops: .diameter)
+                                sizeControl("Switcher diameter", value: binding(\.switcherDiameter), stops: .diameter)
                                 sizeControl("Wheel thickness", value: binding(\.wheelThickness), stops: .thickness)
                                 sizeControl("Center dead zone", value: binding(\.selectionDistance), stops: .deadZone)
                                 VStack(spacing: 5) {
@@ -78,7 +86,7 @@ struct CustomizationPage: View {
                             Button("Reset appearance") {
                                 guard confirmReset("Reset appearance?") else { return }
                                 var next = preferences
-                                next.launcherDiameter = 300; next.quitterDiameter = 300; next.selectionDistance = 86
+                                next.launcherDiameter = 300; next.quitterDiameter = 300; next.switcherDiameter = 300; next.selectionDistance = 86
                                 next.maximumSelectionDistance = nil; next.dynamicIconMovement = false; next.glassFinish = .standard
                                 next.glassAmount = nil; next.wheelThickness = 66
                                 next.settingsTint = .white; next.selectionTint = .white
@@ -89,7 +97,7 @@ struct CustomizationPage: View {
                             wheelPicker
                             ZStack {
                                 PreviewBackdrop(style: backdrop).allowsHitTesting(false).accessibilityHidden(true)
-                                WheelEditor(preferences: preferencesBinding, quitter: quitter, editable: false,
+                                WheelEditor(preferences: preferencesBinding, quitter: quitter, switching: switching, editable: false,
                                             previewLimit: 388)
                             }.frame(height: 400).clipShape(RoundedRectangle(cornerRadius: 18))
                             SlidingChoiceSwitch(selection: Binding(
@@ -99,9 +107,9 @@ struct CustomizationPage: View {
                                 accessibilityTitle: "Preview background")
                             previewHapticsControl
                             VStack(spacing: 4) {
-                                Text("Live preview · \(Int(quitter ? preferences.quitterDiameter : preferences.launcherDiameter)) pt")
+                                Text("Live preview · \(Int(diameter)) pt")
                                     .foregroundStyle(.secondary)
-                                Text((quitter ? preferences.quitterDiameter : preferences.launcherDiameter) + 56 <= 388
+                                Text(diameter + 56 <= 388
                                      ? "Actual size · Hover to try selection." : "Scaled to fit · Same proportions as the wheel.")
                                     .foregroundStyle(.tertiary)
                             }.font(.caption)
@@ -109,18 +117,18 @@ struct CustomizationPage: View {
                     }
                 } else if tab == 2 {
                     HStack {
-                        wheelPicker.frame(width: 220)
+                        wheelPicker.frame(width: 280)
                         Spacer()
                         previewHapticsControl
                         Button(action: addApps) { Label("Add apps…", systemImage: "plus") }
-                            .buttonStyle(.glass).disabled(quitter || preferences.launcherTargets.count >= 24)
+                            .buttonStyle(.glass).disabled(runningWheel || preferences.launcherTargets.count >= 24)
                     }
                     HStack(alignment: .center, spacing: 20) {
                         VStack(spacing: 12) {
-                            WheelEditor(preferences: preferencesBinding, quitter: quitter, editable: true,
+                            WheelEditor(preferences: preferencesBinding, quitter: quitter, switching: switching, editable: true,
                                         previewLimit: 356)
                                 .frame(height: 380)
-                            Text(quitter ? "Preview only · No apps are quit" : "Drag to reorder · Hover × to remove")
+                            Text(switching ? "Preview only · No apps are activated" : quitter ? "Preview only · No apps are quit" : "Drag to reorder · Hover × to remove")
                                 .font(.caption).foregroundStyle(.secondary)
                         }.frame(maxWidth: .infinity).frame(height: 440)
                         appsOptions.frame(width: 340)
@@ -151,7 +159,21 @@ struct CustomizationPage: View {
     }
     @ViewBuilder private var appsOptions: some View {
         VStack(alignment: .leading, spacing: 12) {
-            if quitter {
+            if switching {
+                section("Switcher apps") {
+                    Text("Running apps appear automatically. Choose an app to bring its windows forward.")
+                        .foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                    Text("Enable Switcher and set its shortcut in General.")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+                section("Layout") {
+                    Toggle("Stable app positions", isOn: binding(\.stableSwitcherPositions))
+                    Text(preferences.stableSwitcherPositions
+                         ? "Match Launcher directions and remember other apps. Empty slots stay put until the wheel closes."
+                         : "Space running apps evenly. The wheel updates as apps open and close.")
+                        .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                }
+            } else if quitter {
                 section("Layout") {
                     Toggle("Stable app positions", isOn: binding(\.stableQuitterPositions))
                     Text(preferences.stableQuitterPositions
@@ -250,7 +272,7 @@ struct CustomizationPage: View {
     }
     private var reachLabel: String { preferences.maximumSelectionDistance.map { "\(Int($0)) pt" } ?? "Unlimited" }
     private var wheelPicker: some View {
-        WheelModeSwitch(quitter: $quitter, changed: tick)
+        SlidingChoiceSwitch(selection: $wheel, changed: tick, labels: ["Launcher", "Quitter", "Switcher"], controlWidth: 280, accessibilityTitle: "Preview wheel")
     }
     private var previewHapticsControl: some View {
         HStack(spacing: 6) {

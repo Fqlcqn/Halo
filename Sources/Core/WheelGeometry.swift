@@ -234,6 +234,9 @@ struct HaloPreferences: Codable, Equatable {
     }
     var quitterPreferredAngles: [String: Double] = [:]
     var stableQuitterPositions = false
+    var switcherPreferredAngles: [String: Double] = [:]
+    var stableSwitcherPositions = false
+    var switcherDiameter = 300.0
     var version = 3
     var launcherDiameter = 300.0
     var quitterDiameter = 300.0
@@ -249,6 +252,7 @@ struct HaloPreferences: Codable, Equatable {
 
     init() {}
     enum CodingKeys: String, CodingKey {
+        case switcherDiameter, switcherPreferredAngles, stableSwitcherPositions
         case lessAnimation, previewHaptics, appQuitOverrides, quitterPreferredAngles, stableQuitterPositions
         case glassFinish, glassAmount, wheelThickness, settingsTint, selectionTint, forceQuitApps
         case version, launcherDiameter, quitterDiameter, selectionDistance, maximumSelectionDistance
@@ -270,6 +274,9 @@ struct HaloPreferences: Codable, Equatable {
             : false
         appQuitOverrides = try c.decodeIfPresent([String: Bool].self, forKey: .appQuitOverrides) ?? [:]
         quitterPreferredAngles = try c.decodeIfPresent([String: Double].self, forKey: .quitterPreferredAngles) ?? [:]
+        switcherDiameter = try c.decodeIfPresent(Double.self, forKey: .switcherDiameter) ?? 300
+        switcherPreferredAngles = try c.decodeIfPresent([String: Double].self, forKey: .switcherPreferredAngles) ?? [:]
+        stableSwitcherPositions = try c.decodeIfPresent(Bool.self, forKey: .stableSwitcherPositions) ?? false
         stableQuitterPositions = try c.decodeIfPresent(Bool.self, forKey: .stableQuitterPositions) ?? false
         glassFinish = try c.decodeIfPresent(WheelGlassFinish.self, forKey: .glassFinish) ?? .standard
         glassAmount = try c.decodeIfPresent(Double.self, forKey: .glassAmount)
@@ -293,6 +300,9 @@ struct HaloPreferences: Codable, Equatable {
         appQuitOverrides.keys.allSatisfy { !$0.isEmpty && $0.count <= 255 } &&
         quitterPreferredAngles.count <= 512 &&
         quitterPreferredAngles.allSatisfy { key, value in !key.isEmpty && key.count <= 4096 && value.isFinite && (0..<1).contains(value) } &&
+        switcherPreferredAngles.count <= 512 &&
+        switcherPreferredAngles.allSatisfy { key, value in !key.isEmpty && key.count <= 4096 && value.isFinite && (0..<1).contains(value) } &&
+        switcherDiameter.isFinite && (240...520).contains(switcherDiameter) &&
         settingsTint.isValid && selectionTint.isValid &&
         wheelThickness.isFinite && (36...78).contains(wheelThickness) &&
         (glassAmount.map { $0.isFinite && (0...1).contains($0) } ?? true) &&

@@ -1,10 +1,11 @@
 #import "HaloSettings.h"
+#import <IOKit/hidsystem/IOLLEvent.h>
 
 // Exercise the real settings/runtime handoff with no event tap, native wheel
 // bridge, posted input, application launches, or destructive actions.
 void HaloAddSettingsGlass(void *parent) {}
 void HaloAddCustomizationPage(void *parent, NSInteger tab) {}
-void HaloAddActivationSwitch(void *parent, BOOL quitter, BOOL enabled, void (^changed)(BOOL)) {}
+void HaloAddActivationSwitch(void *parent, NSInteger wheel, BOOL enabled, void (^changed)(BOOL)) {}
 @interface HaloRuntime (Testing)
 - (void)apply:(NSString *)action wheel:(HaloWheel)wheel;
 - (void)menuLauncher:(id)sender;
@@ -76,18 +77,18 @@ int main(void) {
         [runtime.engine update:c.launcher at:3]; drain();
         NSCAssert([runtime.events containsObject:@"show:1"],@"Recording must resume cleanly");
         [runtime stop];
-        for (NSInteger wheel=HaloLauncher;wheel<=HaloQuitter;wheel++) {
+        for (NSInteger wheel=HaloLauncher;wheel<=HaloSwitcher;wheel++) {
             for (NSInteger withFlags=0;withFlags<2;withFlags++) {
                 FixtureDriver *driver=[FixtureDriver new];
                 EventRuntime *input=[[EventRuntime alloc] initWithDriver:driver defaults:defaults];
-                input.engine.config=[HaloShortcutConfig defaults];
-                CGEventFlags flags=kCGEventFlagMaskSecondaryFn | (wheel==HaloQuitter?kCGEventFlagMaskControl:0);
+                input.engine.config=[HaloShortcutConfig defaults]; input.engine.config.switcherEnabled=YES;
+                CGEventFlags flags=kCGEventFlagMaskSecondaryFn | (wheel==HaloQuitter?kCGEventFlagMaskControl:wheel==HaloSwitcher?(kCGEventFlagMaskShift|NX_DEVICELSHIFTKEYMASK):0);
                 keyEvent(input,kCGEventFlagsChanged,63,flags); drain();
                 NSCAssert(input.engine.active==wheel,@"Real event routing opens expected wheel");
                 NSCAssert(keyEvent(input,kCGEventKeyDown,43,withFlags?flags:0),@"Comma is consumed");
                 keyEvent(input,kCGEventKeyDown,43,withFlags?flags:0); drain();
                 NSCAssert(input.settingsPresentations==1,@"Comma opens/brings Settings forward once, including Fn-less key snapshots");
-                NSCAssert(![driver.events containsObject:@"commit:1"] && ![driver.events containsObject:@"commit:2"],@"Settings cancels instead of launching or quitting");
+                NSCAssert(![driver.events containsObject:@"commit:1"] && ![driver.events containsObject:@"commit:2"] && ![driver.events containsObject:@"commit:3"],@"Settings cancels instead of launching or quitting");
                 NSCAssert(keyEvent(input,kCGEventKeyUp,43,flags),@"Comma key-up is consumed");
                 keyEvent(input,kCGEventFlagsChanged,63,0); [input stop]; drain();
             }

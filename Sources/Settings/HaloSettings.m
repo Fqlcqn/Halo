@@ -2,7 +2,7 @@
 #import <ApplicationServices/ApplicationServices.h>
 extern void HaloAddSettingsGlass(void *parent);
 extern void HaloAddCustomizationPage(void *parent, NSInteger tab);
-extern void HaloAddActivationSwitch(void *parent, BOOL quitter, BOOL enabled, void (^changed)(BOOL));
+extern void HaloAddActivationSwitch(void *parent, NSInteger wheel, BOOL enabled, void (^changed)(BOOL));
 
 @interface HaloFlippedView : NSView @end
 @implementation HaloFlippedView
@@ -133,7 +133,7 @@ static NSView *glass(NSRect frame, __unused CGFloat radius, NSView *parent) {
 - (void)windowDidResignKey:(__unused NSNotification *)note { if (_recording>=0) [self stopRecording]; }
 - (void)selectTab:(NSButton *)sender { [self stopRecording]; _tab=sender.tag; [self drawPage]; }
 - (void)drawPage {
-    [self layoutPageWithSize:_tab==1?NSMakeSize(960,700):_tab==2?NSMakeSize(960,600):_tab==3?NSMakeSize(700,535):NSMakeSize(700,480)];
+    [self layoutPageWithSize:_tab==1?NSMakeSize(960,700):_tab==2?NSMakeSize(960,600):_tab==3?NSMakeSize(700,535):NSMakeSize(700,_draft.switcherEnabled?630:536)];
     [self populatePage];
 }
 - (void)layoutPageWithSize:(NSSize)size {
@@ -165,48 +165,65 @@ static NSView *glass(NSRect frame, __unused CGFloat radius, NSView *parent) {
     NSMutableArray *recorders=[NSMutableArray new];
     CGFloat width=_page.bounds.size.width-8;
     CGFloat controlX=width-226;
-    for (NSInteger i=0;i<3;i++) {
+    for (NSInteger i=0;i<(_draft.switcherEnabled?4:3);i++) {
         CGFloat y=46+(i*94);
         NSView *card=[[HaloFlippedView alloc] initWithFrame:NSMakeRect(0,y,width,84)]; [_page addSubview:card];
         card.wantsLayer=YES; card.layer.cornerRadius=12;
         card.layer.backgroundColor=[NSColor.whiteColor colorWithAlphaComponent:.035].CGColor;
-        [card addSubview:label(@[@"Launcher",@"Quitter",@"Settings"] [i],13,NSFontWeightMedium,NSMakeRect(14,14,142,21))];
-        NSString *detail=i==0?@"1–3 keys":i==1?(_draft.launcher.count==3?@"Launcher + one key":@"1–3 keys"):@"While a wheel is open";
+        [card addSubview:label(@[@"Launcher",@"Quitter",@"Settings",@"Switcher"] [i],13,NSFontWeightMedium,NSMakeRect(14,14,142,21))];
+        NSString *detail=i==0?@"1–3 keys":i==1?(_draft.launcher.count==3?@"Launcher + one key":@"1–3 keys"):i==3?@"Running apps only":@"While a wheel is open";
         NSTextField *small=label(detail,11,NSFontWeightRegular,NSMakeRect(14,38,200,22)); small.textColor=NSColor.secondaryLabelColor; [card addSubview:small];
         NSButton *recorder=button(@"",self,@selector(record:),NSMakeRect(controlX,9,212,28));
         recorder.tag=i; recorder.font=[NSFont systemFontOfSize:13 weight:NSFontWeightMedium];
-        recorder.accessibilityLabel=[@[@"Launcher shortcut",@"Quitter shortcut",@"Settings key"] objectAtIndex:i];
+        recorder.accessibilityLabel=[@[@"Launcher shortcut",@"Quitter shortcut",@"Settings key",@"Switcher shortcut"] objectAtIndex:i];
         recorder.toolTip=@"Click to record a shortcut"; [card addSubview:recorder]; [recorders addObject:recorder];
-        if (i<2) {
+        if (i!=2) {
             NSView *mode=[[NSView alloc] initWithFrame:NSMakeRect(controlX,42,212,32)];
             mode.toolTip=@"Hold: release to select. Toggle: click or press the shortcut again to select.";
             [card addSubview:mode];
             __weak HaloSettingsController *weak=self;
-            HaloAddActivationSwitch((__bridge void *)mode,i==1,i==0?_draft.launcherToggle:_draft.quitterToggle,^(BOOL enabled) {
+            HaloAddActivationSwitch((__bridge void *)mode,i==3?HaloSwitcher:i+1,[_draft toggleForWheel:i==3?HaloSwitcher:i+1],^(BOOL enabled) {
                 HaloSettingsController *strong=weak;
                 if (!strong) return;
                 [strong stopRecording];
-                if (i==0) strong->_draft.launcherToggle=enabled; else strong->_draft.quitterToggle=enabled;
-                [strong->_runtime saveConfig:strong->_draft];
+                if (i==0) strong->_draft.launcherToggle=enabled; else if (i==1) strong->_draft.quitterToggle=enabled; else strong->_draft.switcherToggle=enabled;
+                if (!strong->_draft.validationError) [strong->_runtime saveConfig:strong->_draft];
                 [strong updateControls];
             });
         }
     }
     _recorders=recorders;
-    _status=label(@"",11,NSFontWeightRegular,NSMakeRect(0,336,width-110,44));
+    CGFloat footer=_draft.switcherEnabled?430:336;
+    NSButton *switcher=[NSButton checkboxWithTitle:@"Enable Switcher wheel" target:self action:@selector(toggleSwitcher:)];
+    switcher.frame=NSMakeRect(14,footer,width-28,28); switcher.state=_draft.switcherEnabled?NSControlStateValueOn:NSControlStateValueOff;
+    switcher.toolTip=@"Show running apps and bring the selected app’s windows forward.";
+    [_page addSubview:switcher];
+    footer+=56;
+    _status=label(@"",11,NSFontWeightRegular,NSMakeRect(0,footer,width-110,44));
     _status.textColor=NSColor.secondaryLabelColor; [_page addSubview:_status];
-    _permission=button(@"Enable…",self,@selector(permission:),NSMakeRect(width-96,336,96,28)); [_page addSubview:_permission];
-    NSButton *reset=button(@"Reset shortcuts",self,@selector(reset:),NSMakeRect(0,382,116,28));
+    _permission=button(@"Enable…",self,@selector(permission:),NSMakeRect(width-96,footer,96,28)); [_page addSubview:_permission];
+    NSButton *reset=button(@"Reset shortcuts",self,@selector(reset:),NSMakeRect(0,footer+46,116,28));
     reset.bordered=NO; reset.font=[NSFont systemFontOfSize:11]; reset.contentTintColor=NSColor.secondaryLabelColor; [_page addSubview:reset];
-    _cancelRecord=button(@"Cancel",self,@selector(cancelRecord:),NSMakeRect(width-90,382,90,28));
+    _cancelRecord=button(@"Cancel",self,@selector(cancelRecord:),NSMakeRect(width-90,footer+46,90,28));
     _cancelRecord.hidden=YES; [_page addSubview:_cancelRecord];
     [self updateControls]; [self refreshStatus];
+}
+- (void)toggleSwitcher:(NSButton *)sender {
+    [self stopRecording];
+    HaloShortcutConfig *next=[_draft copy]; next.switcherEnabled=sender.state==NSControlStateValueOn;
+    // Show the recorder even when an existing custom shortcut conflicts with
+    // the new default, so the user can resolve it without resetting shortcuts.
+    _draft=next;
+    if (!next.validationError) [_runtime saveConfig:next];
+    [self drawPage];
+    if (next.validationError) _status.stringValue=next.validationError;
 }
 - (void)updateControls {
     if (_tab!=0) return;
     _recorders[0].title=HaloChordName(_draft.launcher);
     _recorders[1].title=HaloChordName(_draft.quitter);
     _recorders[2].title=HaloKeyName(_draft.settingsKey);
+    if (_recorders.count>3) _recorders[3].title=HaloChordName(_draft.switcher);
 }
 - (void)refreshStatus {
     if (_tab!=0 || _recording>=0) return;
@@ -252,7 +269,8 @@ static NSView *glass(NSRect frame, __unused CGFloat radius, NSView *parent) {
     } else if (_recording==1) {
         if (next.launcher.count==3) { NSMutableSet *q=[next.launcher mutableCopy]; [q unionSet:_peak]; next.quitter=q; }
         else next.quitter=_peak;
-    } else next.settingsKey=[_peak.anyObject integerValue];
+    } else if (_recording==3) next.switcher=_peak;
+    else next.settingsKey=[_peak.anyObject integerValue];
     NSString *error=next.validationError;
     if (error) { _status.stringValue=error; _peak=[NSSet set]; _recorders[_recording].title=@"Try again…"; return; }
     _draft=next; [_runtime saveConfig:_draft]; [self stopRecording]; [self drawPage];

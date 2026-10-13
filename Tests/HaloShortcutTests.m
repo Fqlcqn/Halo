@@ -102,6 +102,53 @@ int main(void) {
         e.config=defaults;
         [e update:defaults.launcher at:9]; [e update:K(@[]) at:9.1];
         equal(@[@"show:1",@"commit:1"],@"restoring shortcuts works without restart");
+        // Migration preserves both customized old chords; Switcher is opt-in.
+        NSMutableDictionary *legacy=[changed.dictionary mutableCopy];
+        [legacy removeObjectsForKeys:@[@"switcher",@"switcherEnabled",@"switcherToggle"]];
+        HaloShortcutConfig *migrated=[HaloShortcutConfig fromDictionary:legacy];
+        NSCAssert([migrated.launcher isEqual:changed.launcher] && [migrated.quitter isEqual:changed.quitter] && !migrated.switcherEnabled,@"Migration must preserve shortcuts");
+        clear(); e=engine(); [e update:defaults.switcher at:1]; [e menuOpen:HaloSwitcher];
+        equal(@[],@"disabled Switcher ignores keyboard and menu");
+        HaloShortcutConfig *sw=[defaults copy]; sw.switcherEnabled=YES;
+        NSCAssert([[HaloShortcutConfig fromDictionary:sw.dictionary].dictionary isEqual:sw.dictionary],@"Switcher round trip");
+        HaloShortcutConfig *conflict=[sw copy]; conflict.switcher=conflict.launcher;
+        NSCAssert(conflict.validationError,@"Switcher conflict rejected");
+        conflict.switcher=K(@[@(HaloFn),@43]); NSCAssert(conflict.validationError,@"Settings conflict rejected");
+        conflict.switcher=K(@[@(HaloFn),@(HaloLeftShift)]); conflict.launcher=K(@[@(HaloFn),@(HaloShift)]);
+        NSCAssert(conflict.validationError,@"Generic and left Shift chords cannot alias");
+        clear(); e=engine(); e.config=sw;
+        [e update:K(@[@(HaloFn),@(HaloShift)]) at:1]; [e update:K(@[]) at:1.1];
+        equal(@[],@"right Shift does not open default Switcher");
+        [e update:sw.switcher at:2]; [e update:K(@[]) at:2.1];
+        equal(@[@"show:3",@"commit:3"],@"Switcher hold");
+        for (NSInteger order=0;order<2;order++) for (NSInteger gap=0;gap<40;gap++) {
+            clear(); e=engine(); e.config=sw; [e update:sw.switcher at:10];
+            [e update:K(order?@[@(HaloLeftShift)]:@[@(HaloFn)]) at:11];
+            [e tick:11+gap/1000.0]; [e update:K(@[]) at:11+gap/1000.0]; [e tick:12];
+            equal(@[@"show:3",@"commit:3"],@"Switcher release order never flashes Launcher");
+        }
+        for (HaloWheel from=HaloLauncher;from<=HaloSwitcher;from++) for (HaloWheel to=HaloLauncher;to<=HaloSwitcher;to++) {
+            if (from==to) continue;
+            clear(); e=engine(); e.config=sw;
+            [e update:[sw chordForWheel:from] at:1]; [e update:[sw chordForWheel:to] at:2]; [e tick:2.041];
+            equal(@[[NSString stringWithFormat:@"show:%ld",(long)from],[NSString stringWithFormat:@"commit:%ld",(long)from],[NSString stringWithFormat:@"show:%ld",(long)to]],@"Every wheel handoff commits once");
+        }
+        clear(); e=engine(); e.config=sw; e.config.switcherToggle=YES;
+        [e update:sw.switcher at:1]; [e update:K(@[]) at:2];
+        NSCAssert(e.active==HaloSwitcher,@"Toggle remains open");
+        [e update:sw.switcher at:3]; equal(@[@"show:3",@"commit:3"],@"Switcher toggle confirmation");
+        clear(); e=engine(); e.config=sw; [e menuOpen:HaloSwitcher]; [e confirm];
+        equal(@[@"show:3",@"commit:3"],@"Switcher menu confirmation");
+        for (NSNumber *key in @[@43,@53]) {
+            clear(); e=engine(); e.config=sw; [e update:sw.switcher at:1];
+            NSMutableSet *keys=[sw.switcher mutableCopy]; [keys addObject:key]; [e update:keys at:2];
+            NSCAssert([events containsObject:@"cancel:3"] && ![events containsObject:@"commit:3"],@"Settings/Escape cancels Switcher");
+        }
+        clear(); e=engine(); e.config=sw; [e update:sw.switcher at:1];
+        HaloShortcutConfig *off=[sw copy]; off.switcherEnabled=NO; e.config=off;
+        [e update:K(@[]) at:2]; [e update:sw.switcher at:3];
+        equal(@[@"show:3",@"cancel:3"],@"Disabling cancels and prevents new sessions");
+        NSCAssert(HaloChordMatches(K(@[@(HaloShift)]),K(@[@(HaloLeftShift)]),YES),@"Old generic Shift shortcuts still match left Shift");
         puts("PASS: validation, persistence, exact chords, hold/toggle modes, settings, switching, no-flash release, recording suppression, and immediate config replacement.");
     }
     return 0;

@@ -51,7 +51,12 @@ import AppKit
         return NSWorkspace.shared.urlForApplication(withBundleIdentifier: target.resolvedBundleIdentifier)
     }
 
+    func switcher() -> [WheelItem] { runningItems(switching: true) }
     func quitter(showsTrash: Bool = true, excluding: Set<pid_t> = []) -> [WheelItem] {
+        let trash = WheelItem(id: "action:empty-trash", name: "Empty Trash", icon: nil, action: .emptyTrash)
+        return (showsTrash ? [trash] : []) + runningItems(excluding: excluding)
+    }
+    private func runningItems(excluding: Set<pid_t> = [], switching: Bool = false) -> [WheelItem] {
         let ownPID = ProcessInfo.processInfo.processIdentifier
         let frontPID = NSWorkspace.shared.frontmostApplication?.processIdentifier
         let running = NSWorkspace.shared.runningApplications.filter {
@@ -61,14 +66,13 @@ import AppKit
             if ($0.processIdentifier == frontPID) != ($1.processIdentifier == frontPID) { return $0.processIdentifier == frontPID }
             return ($0.localizedName ?? "").localizedCaseInsensitiveCompare($1.localizedName ?? "") == .orderedAscending
         }
-        let trash = WheelItem(id: "action:empty-trash", name: "Empty Trash", icon: nil, action: .emptyTrash)
         let livePIDs = Set(running.map(\.processIdentifier))
         quitterIcons = quitterIcons.filter { livePIDs.contains($0.key) }
-        return (showsTrash ? [trash] : []) + running.map { app in
+        return running.map { app in
             let icon = quitterIcons[app.processIdentifier] ?? app.icon ?? app.bundleURL.map { NSWorkspace.shared.icon(forFile: $0.path) }
             icon?.size = NSSize(width: 256, height: 256)
             quitterIcons[app.processIdentifier] = icon
-            return WheelItem(id: "pid:\(app.processIdentifier)", name: app.localizedName ?? "Application", icon: icon, action: .quit(app))
+            return WheelItem(id: "pid:\(app.processIdentifier)", name: app.localizedName ?? "Application", icon: icon, action: switching ? .activate(app) : .quit(app))
         }
     }
 

@@ -86,11 +86,11 @@ private struct ActivationSwitch: View {
 }
 
 @_cdecl("HaloAddActivationSwitch") @MainActor
-func addActivationSwitch(_ pointer: UnsafeMutableRawPointer, _ quitter: Bool, _ enabled: Bool,
+func addActivationSwitch(_ pointer: UnsafeMutableRawPointer, _ wheel: Int, _ enabled: Bool,
                          _ changed: @escaping @convention(block) (Bool) -> Void) {
     let parent = Unmanaged<NSView>.fromOpaque(pointer).takeUnretainedValue()
     let host = ActivationSwitchHost(rootView: ActivationSwitch(enabled: enabled,
-        title: quitter ? "Quitter activation" : "Launcher activation", changed: changed))
+        title: wheel == 3 ? "Switcher activation" : wheel == 2 ? "Quitter activation" : "Launcher activation", changed: changed))
     host.sizingOptions = []; host.safeAreaRegions = []
     host.frame = parent.bounds; host.autoresizingMask = [.width, .height]
     parent.addSubview(host)

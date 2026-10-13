@@ -259,8 +259,17 @@ import Foundation
         legacy.removeValue(forKey: "lessAnimation"); legacy.removeValue(forKey: "previewHaptics")
         legacy.removeValue(forKey: "appQuitOverrides")
         legacy.removeValue(forKey: "stableQuitterPositions")
+        for key in ["switcherDiameter", "switcherPreferredAngles", "stableSwitcherPositions"] { legacy.removeValue(forKey: key) }
         defaults.set(try! JSONSerialization.data(withJSONObject: legacy), forKey: PreferenceStore.key)
         expect(PreferenceStore(defaults: defaults).value == preferences, "Old settings migrate without losing customization")
+        preferences.switcherDiameter = 412
+        preferences.stableSwitcherPositions = true
+        preferences.switcherPreferredAngles = ["example.switcher": 0.5]
+        expect(store.save(preferences) && PreferenceStore(defaults: defaults).value == preferences, "Switcher customization survives restart")
+        var invalidSwitcher = preferences; invalidSwitcher.switcherDiameter = 521
+        expect(!store.save(invalidSwitcher), "Switcher diameter is bounded")
+        invalidSwitcher = preferences; invalidSwitcher.switcherPreferredAngles["example.switcher"] = -0.1
+        expect(!store.save(invalidSwitcher), "Switcher remembered angles are validated")
         preferences.appQuitOverrides = ["example.editor": false, "example.game": true]
         preferences.quitterPreferredAngles = ["example.editor": 0.25, "url:/Applications/NoBundle.app": 0.75]
         for enabled in [true, false] {
