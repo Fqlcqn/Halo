@@ -9,7 +9,7 @@ release: project
 test:
 	python3 Scripts/test.py
 verify: test build
-	"Build/Debug/Halo.app/Contents/MacOS/Halo" --self-test
+	"Build/Debug/Halo.app/Contents/MacOS/Halo" --self-test --reopen-fixtures "$(CURDIR)/Build/ReopenFixtures/manifest.json"
 preview: build
 	open "Build/Debug/Halo.app" --args --safe-mode
 status:

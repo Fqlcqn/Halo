@@ -2,6 +2,25 @@
 
 Reference: Halo 0.2.1 (6), copied from the former hybrid project's `Latest/Halo.app` at reconstruction time. That historical project is now Halo Legacy; its baseline is preserved separately. Current Halo is entirely source-built. Historical provenance and baseline hashes are in `VERIFICATION.md`. The complete original Swift source was **not** recovered; this is a reconstruction from public API behavior, executable inspection, and visual evidence.
 
+## Dock-style reopening (1.3.1)
+
+Launcher and Switcher activate the selected running process and send it
+`kAEReopenApplication` (`aevt/rapp`). Apple documents this as the event sent
+[when a running app's Dock icon is clicked](https://developer.apple.com/documentation/coreservices/1556377-kaeqdnotor/kaereopenapplication).
+The target app decides whether to restore an existing/minimized window or create
+its normal window/document/start screen. Halo does not infer windowlessness from
+screen visibility, request window-inspection permissions, or synthesize New Window
+keystrokes. No universal new-tab guarantee is made for apps that themselves ignore
+Dock reopening. Quitter actions are unchanged.
+
+Delivery targets the existing PID and is sent off the main thread without waiting
+for a reply. A stale Switcher item cannot launch a replacement process. Launcher
+retains its normal cold-launch path and explicit installed-copy selection.
+Manual acceptance includes Finder with all windows closed and Opera with all
+tabs/windows closed, plus Spaces/full-screen behavior under the user's app settings.
+The automated suite uses disposable apps only, exercising both wheel actions,
+existing/no/minimized/hidden windows, same-bundle app copies and terminated targets.
+
 ## Switcher extension (1.3.0)
 
 Switcher uses the production wheel renderer, Launcher angular origin and app

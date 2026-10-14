@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.3.1 (20) — Dock-style window reopening, 2026-10-14
+
+- Launcher and Switcher now send the standard macOS Dock reopen event to a selected running app, in addition to bringing its windows forward. Apps can recreate their usual window/start screen after the last window closes or restore a minimized window according to their own Dock behavior.
+- Uses the exact running process, with asynchronous no-reply delivery. No window counting, simulated New Window keystrokes, duplicate launch fallback or Quitter changes. Launcher continues to open stopped apps and preserves the chosen installed copy; Switcher never launches an exited selection.
+- Added 28 integration checks using two disposable app copies: both wheel routes, window creation/reuse, minimized/hidden restoration, process targeting, safe-mode suppression and stale Switcher selection. The fixtures terminate after testing, with an automatic timeout as a fallback.
+
 ## 1.3.0 (19) — Switcher wheel, 2026-10-12
 
 - Added an opt-in Switcher wheel for running apps. Selection activates the exact running process with all windows, like Launcher, without launching a stopped app or exposing Quit/Trash actions. Running-app changes refresh the wheel.

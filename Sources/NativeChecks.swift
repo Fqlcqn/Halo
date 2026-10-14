@@ -2,7 +2,7 @@
 import AppKit
 import SwiftUI
 
-/// Integration tests enter the real window/animation controller, but never invoke live actions.
+/// Native tests use safe wheel items; reopen integration acts only on disposable fixture apps.
 @MainActor enum NativeChecks {
     static func glassComparison() {
         let items = ApplicationCatalog().launcher(targets: LauncherTarget.original)
@@ -256,7 +256,11 @@ import SwiftUI
         expect(controller.takeSelection() == nil, "Empty catalog is safe")
         controller.hide()
         await settle()
-        print("PASS: \(checks) native window/lifecycle checks, including 100 rapid cycles. No real app or Trash actions executed.")
+        if let index = CommandLine.arguments.firstIndex(of: "--reopen-fixtures"), index + 1 < CommandLine.arguments.count {
+            do { _ = try await ReopenChecks.run(manifest: URL(fileURLWithPath: CommandLine.arguments[index + 1])) }
+            catch { preconditionFailure("Reopen fixtures failed: \(error)") }
+        }
+        print("PASS: \(checks) native window/lifecycle checks, including 100 rapid cycles. No user-app or Trash actions executed.")
     }
 }
 #endif

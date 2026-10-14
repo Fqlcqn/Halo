@@ -11,7 +11,7 @@ shortcuts, animation, and haptics.
 
 ## Install
 
-Requires **macOS 26+**, Apple silicon or Intel. Download `Halo-1.3.0-macOS.zip`
+Requires **macOS 26+**, Apple silicon or Intel. Download `Halo-1.3.1-macOS.zip`
 from this repository's Releases, unzip, move Halo.app to Applications, and open
 it. Quit older Halo copies first. There is no account, subscription, telemetry,
 or automatic updater.
@@ -41,11 +41,18 @@ menu-bar icon always provides access, even without shortcut permissions.
 Enable **General → Enable Switcher wheel** to add a running-app switcher.
 Its default shortcut is **Fn + Left Shift**; record a different chord or choose
 Hold/Toggle in the shortcut card that appears. Select an app to bring all its
-windows forward, using the same activation behavior as Launcher. Switcher never
+windows forward, using the same Dock-style reopen behavior as Launcher. Switcher never
 launches a stopped app. Right Shift does not trigger its default shortcut.
 It lists the same regular running apps as Quitter, including Finder and hidden
 apps, without Trash or background helpers. The frontmost app comes first, followed
 by app name. The list updates when apps open or close.
+
+When a running app is selected in Launcher or Switcher, Halo also sends the
+standard macOS reopen event used by a Dock click. The app can restore or create
+its normal window when all windows are closed, or restore a minimized window.
+Each app controls that response, including whether it shows a new document,
+browser window/tab, or start screen. Existing windows are not replaced by a
+forced New Window command. Quitter continues to quit apps/close Finder windows.
 
 Switcher shares glass, tint, thickness, selection reach/dead zone, pointer motion,
 animation and wheel haptics. Appearance has a separate Switcher diameter; both

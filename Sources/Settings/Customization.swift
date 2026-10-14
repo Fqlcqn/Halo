@@ -161,7 +161,7 @@ struct CustomizationPage: View {
         VStack(alignment: .leading, spacing: 12) {
             if switching {
                 section("Switcher apps") {
-                    Text("Running apps appear automatically. Choose an app to bring its windows forward.")
+                    Text("Running apps appear automatically. Choose an app to bring it forward or reopen its window, like clicking its Dock icon.")
                         .foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
                     Text("Enable Switcher and set its shortcut in General.")
                         .font(.caption).foregroundStyle(.secondary)

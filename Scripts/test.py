@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
-"""Harmless tests only: no live force quit, Trash, input injection, or app launch."""
+"""Harmless tests only: no live force quit, Trash, or input injection."""
+import json
+import plistlib
+import shutil
+import uuid
 import subprocess
 import tempfile
 from pathlib import Path
@@ -30,4 +34,28 @@ def main():
                 text = source.read_text()
                 assert '0x1000' not in text and 'dlsym(' not in text and 'mprotect(' not in text, f'Binary dependency: {source}'
         print('PASS no fixed-address hooks or binary patching in rebuilt sources')
+        # Native verification opens only these two disposable apps, sharing a
+        # fresh identity to catch accidental bundle-ID / installed-copy routing.
+        fixture_root = ROOT/'Build/ReopenFixtures'
+        fixture_root.mkdir(parents=True, exist_ok=True)
+        identity = 'Halo.ReopenFixture.' + uuid.uuid4().hex
+        run('xcrun','swiftc','-parse-as-library','-swift-version','6','-warnings-as-errors',
+            'Tests/ReopenFixture.swift','-o',tmp/'ReopenFixture')
+        paths = []
+        for name in ['First', 'Second']:
+            folder = fixture_root/name
+            folder.mkdir(exist_ok=True)
+            for filename in ['state.json','command']:
+                (folder/filename).unlink(missing_ok=True)
+            app = folder/'ReopenFixture.app'
+            (app/'Contents/MacOS').mkdir(parents=True, exist_ok=True)
+            shutil.copy2(tmp/'ReopenFixture', app/'Contents/MacOS/ReopenFixture')
+            (app/'Contents/Info.plist').write_bytes(plistlib.dumps(dict(
+                CFBundleIdentifier=identity, CFBundleExecutable='ReopenFixture',
+                CFBundleName='Halo disposable fixture', CFBundlePackageType='APPL',
+                LSMinimumSystemVersion='26.0', NSPrincipalClass='NSApplication')))
+            run('codesign','--force','--sign','-',app)
+            paths.append(str(app))
+        (fixture_root/'manifest.json').write_text(json.dumps(paths))
+
 if __name__ == '__main__': main()

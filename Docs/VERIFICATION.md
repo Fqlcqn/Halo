@@ -1,5 +1,12 @@
 # Verification record
 
+## October 14, 2026 — 1.3.1 (20)
+
+- `make verify` passed the existing shortcut/runtime suites, 18,586 geometry/layout/preferences checks and 4,023 native window/lifecycle checks, plus 28 new Dock-reopen integration checks. Native totals vary with eligible running apps.
+- The new checks call production `ActionService` from both Launcher and Switcher paths against two separately installed disposable apps sharing a fresh bundle ID. Actual macOS reopen delivery reached only the selected process, created one window when none existed, reused visible windows, restored minimized/hidden windows without duplicates, and did nothing in safe mode. A terminated Switcher selection stayed terminated.
+- The same test also verifies Launcher's cold launch and installed-copy selection. Fixture processes quit normally after success/failure and carry a 90-second fallback lifetime; no user-app windows, force quit, Finder close or Empty Trash were exercised.
+- Release/install/package/status check universal builds, signatures, source freshness, archive integrity and installed bytes. Actual Finder/Opera configurations, cross-Space/full-screen behavior, physical shortcuts/haptics, notarization and clean-Mac acceptance are not established by fixture success.
+
 ## October 12, 2026 — 1.3.0 (19)
 
 - `make verify` passed: 18,586 geometry/layout/preferences checks and 4,023 native window/lifecycle checks, plus shortcut/runtime suites and harmless Trash simulations. Counts depend on eligible running apps; no real force quit or Empty Trash was performed.

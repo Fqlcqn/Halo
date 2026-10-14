@@ -30,18 +30,18 @@ import AppKit
         guard !safeMode else { print("SAFE PREVIEW: \(item.name), no action executed"); return }
         switch item.action {
         case .launch(let url, let bundleIdentifier):
-            // Match the behavior users expect from an app switcher: a running
-            // application is activated with all of its windows; only an app
-            // that is not running is launched from disk.
+            // Existing apps get the same reopen event as a Dock click. Only
+            // Launcher may launch an app that is not already running.
             if let running = NSWorkspace.shared.runningApplications.first(where: {
                 $0.bundleIdentifier == bundleIdentifier && !$0.isTerminated &&
                 $0.bundleURL?.standardizedFileURL.resolvingSymlinksInPath() == url.standardizedFileURL.resolvingSymlinksInPath()
             }) {
-                running.activate(options: [.activateAllWindows])
+                reopen(running, name: item.name)
                 return
             }
             let configuration = NSWorkspace.OpenConfiguration()
             configuration.activates = true
+            configuration.allowsRunningApplicationSubstitution = false
             // Launch the chosen copy if another variant with the same bundle
             // identifier is already running at a different location.
             configuration.createsNewApplicationInstance = NSWorkspace.shared.runningApplications.contains {
@@ -52,9 +52,7 @@ import AppKit
                 if let error { Task { @MainActor in Self.report("Could not open \(item.name)", detail: error.localizedDescription) } }
             }
         case .activate(let application):
-            // A stale selection must never relaunch an app that has exited.
-            guard !application.isTerminated else { return }
-            application.activate(options: [.activateAllWindows])
+            reopen(application, name: item.name)
         case .quit(let application):
             guard !application.isTerminated else { return }
             if !pendingQuitIDs.contains(application.processIdentifier) { prepare(item) }
@@ -81,6 +79,23 @@ import AppKit
                 let error = await Task.detached(priority: .utility) { Self.runScript(url) }.value
                 trashPending = false
                 if let error { Self.report("Could not empty Trash", detail: error) }
+            }
+        }
+    }
+
+    private func reopen(_ application: NSRunningApplication, name: String) {
+        guard !application.isTerminated else { return }
+        application.activate(options: [.activateAllWindows])
+        let pid = application.processIdentifier
+        Task {
+            guard !application.isTerminated else { return }
+            let failure = await Task.detached(priority: .userInitiated) {
+                ApplicationReopener.send(to: pid)
+            }.value
+            // A quit during delivery is harmless. Never retry by launching an
+            // app or issuing a generic New Window command that could duplicate UI.
+            if let failure, !application.isTerminated {
+                Self.report("Could not reopen \(name)", detail: failure)
             }
         }
     }
