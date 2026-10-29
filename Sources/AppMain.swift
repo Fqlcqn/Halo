@@ -76,6 +76,7 @@ import AppKit
         image.isTemplate = true; item.button?.image = image
         let input = HaloRuntime(driver: coordinator, defaults: defaults)!
         runtime = input
+        coordinator.requiresKeyboardFocus = { [weak input] in input?.inputReady != true }
         coordinator.launcher.onKeyEvent = { [weak input] in input?.handleWheelKeyEvent($0) ?? false }
         coordinator.quitter.onKeyEvent = { [weak input] in input?.handleWheelKeyEvent($0) ?? false }
         coordinator.switcher.onKeyEvent = { [weak input] in input?.handleWheelKeyEvent($0) ?? false }

@@ -80,7 +80,7 @@ The table below records the reconstruction baseline. Requested changes in 1.0.1 
 | Menu-bar glyph | 18 pt image; annulus at 2.1/13.8 outer and 5.3/7.4 inner |
 | Haptics | Launcher selection levelChange/default; Quitter selection alignment/default; commit generic/now |
 
-The unchanged editable shortcut state machine and Settings General layout were carried forward, replacing the executable-address interface with the explicit `HaloWheelDriver` protocol. The new wheel controller uses a 120 Hz pointer sampler only while visible; it is stopped on hide. The original used NSEvent mouse monitors. This is an intentional implementation difference, not a claimed recovery of original source.
+The unchanged editable shortcut state machine and Settings General layout were carried forward, replacing the executable-address interface with the explicit `HaloWheelDriver` protocol. Since 1.3.2, the wheel controller uses local and global NSEvent move/drag monitors with a 120 Hz common-mode sampler as a fallback, all stopped on hide. Selection samples current desktop coordinates and remains available before reveal animation. Authorized global input keeps the previous key window; only the permission-limited fallback makes the wheel key. These are intentional implementation changes, not a claimed recovery of original source. See POINTER_INPUT.md for the thumb-specific investigation and remaining physical acceptance.
 
 ## Evidence used
 

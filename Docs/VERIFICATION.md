@@ -1,5 +1,27 @@
 # Verification record
 
+## October 29, 2026 — 1.3.2 (21) pointer input
+
+- `make verify` passes shortcut/runtime tests, 18,586 geometry/layout/preferences
+  checks, harmless Trash simulations, 4,090 native window/lifecycle checks, and
+  28 Dock-reopen checks against disposable apps. All fixture apps exit.
+- New checks cover key-window preservation, key-panel permission fallback, all
+  three coordinator routes, mouse-move and left/right/other drag delivery in the
+  same turn before polling/reveal, neutral return, latest-position sampling,
+  closed-session guards, 50 rapid tracked reopen cycles, and timer cleanup.
+- Unposted runtime click events verify menu confirmation and hold-mode release
+  across all three wheels. They caught and now cover the first shortcut being
+  ignored after confirmation with no keys held.
+- Native pointer tests use injected coordinates and in-process AppKit events;
+  no real cursor movement, force quit, or Empty Trash is automated.
+- The thumb-specific physical cursor pause has not been reproduced in automation.
+  Removal of unconditional key-window takeover is a targeted mitigation, not a
+  confirmed diagnosis of macOS contact recognition. See `POINTER_INPUT.md`.
+- Release and installation integrity are checked with `make release`,
+  `make install`, `make package`, and `make status`; build/deployment manifests
+  remain local. Physical thumb feel, haptics and clean-Mac acceptance remain
+  separate from these checks.
+
 ## October 14, 2026 — 1.3.1 (20)
 
 - `make verify` passed the existing shortcut/runtime suites, 18,586 geometry/layout/preferences checks and 4,023 native window/lifecycle checks, plus 28 new Dock-reopen integration checks. Native totals vary with eligible running apps.

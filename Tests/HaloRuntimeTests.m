@@ -20,7 +20,7 @@ void HaloAddActivationSwitch(void *parent, NSInteger wheel, BOOL enabled, void (
 - (void)showWheel:(HaloWheel)wheel { [self.events addObject:[NSString stringWithFormat:@"show:%ld",(long)wheel]]; }
 - (void)hideWheel:(HaloWheel)wheel {}
 - (void)commitWheel:(HaloWheel)wheel { [self.events addObject:[NSString stringWithFormat:@"commit:%ld",(long)wheel]]; }
-- (NSRect)frameForWheel:(HaloWheel)wheel { return NSMakeRect(0,0,300,300); }
+- (NSRect)frameForWheel:(HaloWheel)wheel { return NSMakeRect(-100000,-100000,200000,200000); }
 @end
 @interface EventRuntime : HaloRuntime
 @property NSInteger settingsPresentations;
@@ -32,6 +32,10 @@ void HaloAddActivationSwitch(void *parent, NSInteger wheel, BOOL enabled, void (
 static BOOL keyEvent(HaloRuntime *runtime, CGEventType type, CGKeyCode code, CGEventFlags flags) {
     CGEventRef event=CGEventCreateKeyboardEvent(NULL,code,type==kCGEventKeyDown);
     CGEventSetType(event,type); CGEventSetFlags(event,flags);
+    BOOL consumed=[runtime event:event type:type]==NULL; CFRelease(event); return consumed;
+}
+static BOOL clickEvent(HaloRuntime *runtime, CGEventType type) {
+    CGEventRef event=CGEventCreateMouseEvent(NULL,type,CGPointZero,kCGMouseButtonLeft);
     BOOL consumed=[runtime event:event type:type]==NULL; CFRelease(event); return consumed;
 }
 @interface TestRuntime : HaloRuntime
@@ -77,6 +81,27 @@ int main(void) {
         [runtime.engine update:c.launcher at:3]; drain();
         NSCAssert([runtime.events containsObject:@"show:1"],@"Recording must resume cleanly");
         [runtime stop];
+        // The normal focus-preserving panel relies on this tap route for
+        // click confirmation. These events are never posted to the system.
+        for (HaloWheel wheel=HaloLauncher;wheel<=HaloSwitcher;wheel++) {
+            FixtureDriver *clickDriver=[FixtureDriver new];
+            EventRuntime *clicks=[[EventRuntime alloc] initWithDriver:clickDriver defaults:defaults];
+            clicks.engine.config=[HaloShortcutConfig defaults]; clicks.engine.config.switcherEnabled=YES;
+            [clicks.engine menuOpen:wheel]; drain();
+            NSCAssert(clickEvent(clicks,kCGEventLeftMouseDown),@"Menu wheel consumes click down without panel focus");
+            NSCAssert(clickEvent(clicks,kCGEventLeftMouseUp),@"Menu wheel consumes click up without panel focus"); drain();
+            NSString *commit=[NSString stringWithFormat:@"commit:%ld",(long)wheel];
+            NSCAssert([clickDriver.events containsObject:commit] && clicks.engine.active==HaloNoWheel,@"Click commits a focusless menu session");
+            [clickDriver.events removeAllObjects];
+            CGEventFlags flags=kCGEventFlagMaskSecondaryFn | (wheel==HaloQuitter?kCGEventFlagMaskControl:wheel==HaloSwitcher?(kCGEventFlagMaskShift|NX_DEVICELSHIFTKEYMASK):0);
+            keyEvent(clicks,kCGEventFlagsChanged,63,flags); drain();
+            NSCAssert(clicks.engine.active==wheel,@"The first shortcut after a completed menu click opens immediately");
+            NSCAssert(!clickEvent(clicks,kCGEventLeftMouseDown) && !clickEvent(clicks,kCGEventLeftMouseUp),@"Hold mode remains release-to-select");
+            NSCAssert(clicks.engine.active==wheel,@"Incidental thumb clicks do not confirm a hold wheel");
+            keyEvent(clicks,kCGEventFlagsChanged,63,0); drain();
+            NSCAssert([clickDriver.events containsObject:commit],@"Modifier release still commits without panel focus");
+            [clicks stop]; drain();
+        }
         for (NSInteger wheel=HaloLauncher;wheel<=HaloSwitcher;wheel++) {
             for (NSInteger withFlags=0;withFlags<2;withFlags++) {
                 FixtureDriver *driver=[FixtureDriver new];

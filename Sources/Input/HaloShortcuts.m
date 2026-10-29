@@ -104,7 +104,7 @@ static const NSTimeInterval HaloHandoffDelay = .04;
     [self close:NO]; _active=wheel; _returnAt=0; [self emit:@"show" wheel:wheel];
 }
 - (void)cancelUntilRelease { [self close:NO]; _returnAt=0; _blocked=_held.count>0; }
-- (void)confirm { [self close:YES]; _returnAt=0; _blocked=YES; }
+- (void)confirm { [self close:YES]; _returnAt=0; _blocked=_held.count>0; }
 - (void)openSettings { [self cancelUntilRelease]; [self emit:@"settings" wheel:HaloNoWheel]; }
 - (void)switchTo:(HaloWheel)wheel { [self close:YES]; [self open:wheel]; }
 - (void)menuOpen:(HaloWheel)wheel {

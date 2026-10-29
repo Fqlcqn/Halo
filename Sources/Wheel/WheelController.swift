@@ -8,7 +8,8 @@ enum WheelPresentation {
 
 final class WheelPanel: NSPanel {
     var handleKey: ((NSEvent) -> Bool)?
-    override var canBecomeKey: Bool { true }
+    var requiresKeyboardFocus = true
+    override var canBecomeKey: Bool { requiresKeyboardFocus }
     override var canBecomeMain: Bool { false }
     override func keyDown(with event: NSEvent) { _ = handleKey?(event) }
     override func keyUp(with event: NSEvent) { _ = handleKey?(event) }
@@ -19,6 +20,8 @@ final class WheelPanel: NSPanel {
     private(set) var panel: NSPanel?
     private var generation = 0
     private var tracking: Timer?
+    private var localPointerMonitor: Any?
+    private var globalPointerMonitor: Any?
     private var canCommit = false
     var haptics = true
     var safeMode = false
@@ -26,11 +29,16 @@ final class WheelPanel: NSPanel {
     private var lastMouse: CGPoint?
     var onAccessibilitySelect: ((Int) -> Void)?
     var onKeyEvent: ((NSEvent) -> Bool)?
+    private let pointerLocation: () -> CGPoint
 
-    func show(items: [WheelItem], geometry: WheelGeometry, layoutSlots: [WheelLayoutSlot] = [], center: CGPoint? = nil, trackMouse: Bool = true, instant: Bool = false) {
+    init(pointerLocation: @escaping () -> CGPoint = { NSEvent.mouseLocation }) {
+        self.pointerLocation = pointerLocation
+    }
+
+    func show(items: [WheelItem], geometry: WheelGeometry, layoutSlots: [WheelLayoutSlot] = [], center: CGPoint? = nil, trackMouse: Bool = true, instant: Bool = false, requiresKeyboardFocus: Bool = true) {
         generation += 1
         let ticket = generation
-        tracking?.invalidate(); tracking = nil
+        stopPointerTracking()
         canCommit = true
         lastMouse = nil
         var reset = Transaction(); reset.disablesAnimations = true
@@ -44,11 +52,11 @@ final class WheelPanel: NSPanel {
             state.geometry = geometry; state.items = items; state.layoutSlots = layoutSlots
             state.motion.lift = dynamicIconMovement ? 0 : 8
         }
-        let origin = center ?? NSEvent.mouseLocation
+        let origin = center ?? pointerLocation()
         let frame = NSRect(x: origin.x - geometry.panelSize/2, y: origin.y - geometry.panelSize/2, width: geometry.panelSize, height: geometry.panelSize)
         if panel == nil {
             let window = WheelPanel(contentRect: frame, styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
-            window.becomesKeyOnlyIfNeeded = false
+            window.becomesKeyOnlyIfNeeded = true
             window.handleKey = { [weak self] in self?.onKeyEvent?($0) ?? false }
             window.isOpaque = false; window.backgroundColor = .clear; window.hasShadow = false
             window.level = .statusBar
@@ -64,9 +72,17 @@ final class WheelPanel: NSPanel {
             window.contentView = host
             panel = window
         }
+        // The event tap already owns keyboard routing when authorized. Taking
+        // key focus as a contact starts is unnecessary in that path. Keep the
+        // key panel only for the monitor fallback (which cannot consume keys
+        // delivered to another app). Also prevent clicks from taking focus.
+        if let window = panel as? WheelPanel {
+            if !requiresKeyboardFocus && window.isKeyWindow { window.resignKey() }
+            window.requiresKeyboardFocus = requiresKeyboardFocus
+        }
         panel?.setFrame(frame, display: true)
         panel?.orderFrontRegardless()
-        if trackMouse { panel?.makeKey() }
+        if trackMouse && requiresKeyboardFocus { panel?.makeKey() }
         // Make the wheel interactive immediately. The first hover should not
         // wait for a deferred SwiftUI state update or the first timer tick.
         withTransaction(reset) { state.revealed = true }
@@ -83,16 +99,41 @@ final class WheelPanel: NSPanel {
             if trackMouse { self.updateSelection() }
         }
         if trackMouse {
+            let mask: NSEvent.EventTypeMask = [.mouseMoved, .leftMouseDragged, .rightMouseDragged, .otherMouseDragged]
+            // AppKit invokes both monitor callbacks on the main thread. Always
+            // sample the current desktop position, not a queued event's old
+            // location or window-relative coordinates. Never consume motion.
+            localPointerMonitor = NSEvent.addLocalMonitorForEvents(matching: mask) { [weak self] event in
+                MainActor.assumeIsolated {
+                    if self?.generation == ticket { self?.updateSelection() }
+                }
+                return event
+            }
+            globalPointerMonitor = NSEvent.addGlobalMonitorForEvents(matching: mask) { [weak self] _ in
+                MainActor.assumeIsolated {
+                    if self?.generation == ticket { self?.updateSelection() }
+                }
+            }
+            // Fallback for coalesced/missed events and movement across windows.
             let timer = Timer(timeInterval: 1.0 / 120.0, repeats: true) { [weak self] _ in
-                MainActor.assumeIsolated { self?.updateSelection() }
+                MainActor.assumeIsolated {
+                    if self?.generation == ticket { self?.updateSelection() }
+                }
             }
             tracking = timer; RunLoop.main.add(timer, forMode: .common)
         }
     }
 
+    private func stopPointerTracking() {
+        tracking?.invalidate(); tracking = nil
+        if let localPointerMonitor { NSEvent.removeMonitor(localPointerMonitor) }
+        if let globalPointerMonitor { NSEvent.removeMonitor(globalPointerMonitor) }
+        localPointerMonitor = nil; globalPointerMonitor = nil
+    }
+
     func updateSelection() {
-        guard let panel, panel.isVisible else { return }
-        let mouse = NSEvent.mouseLocation
+        guard state.revealed, let panel, panel.isVisible else { return }
+        let mouse = pointerLocation()
         guard mouse != lastMouse else { return }
         lastMouse = mouse
         let dx = mouse.x-panel.frame.midX, dy = mouse.y-panel.frame.midY
@@ -136,7 +177,7 @@ final class WheelPanel: NSPanel {
         generation += 1
         let ticket = generation
         canCommit = false
-        tracking?.invalidate(); tracking = nil
+        stopPointerTracking()
         if immediately || state.instantTransitions || !state.presentationReady || NSWorkspace.shared.accessibilityDisplayShouldReduceMotion {
             var transaction = Transaction(); transaction.disablesAnimations = true
             withTransaction(transaction) { state.revealed = false; state.selected = nil }
@@ -181,6 +222,7 @@ final class WheelPanel: NSPanel {
     let catalog = ApplicationCatalog()
     let store: PreferenceStore
     let actions: ActionService
+    var requiresKeyboardFocus: () -> Bool = { true }
     private struct QuitterSession {
         let slots: [WheelLayoutSlot]
         let activeIdentifiers: Set<String>
@@ -277,14 +319,14 @@ final class WheelPanel: NSPanel {
             let items = catalog.quitter(showsTrash: preferences.showsTrash, excluding: actions.pendingQuitIDs)
             let session = preferences.stableQuitterPositions ? newQuitterSession(items: items, preferences: preferences, geometry: geometry) : nil
             quitterSession = session
-            c.show(items: items, geometry: geometry, layoutSlots: session?.slots ?? [], instant: instant)
+            c.show(items: items, geometry: geometry, layoutSlots: session?.slots ?? [], instant: instant, requiresKeyboardFocus: requiresKeyboardFocus())
         } else if wheel == .switcher {
             let items = catalog.switcher()
             let session = preferences.stableSwitcherPositions ? newQuitterSession(items: items, preferences: preferences, geometry: geometry, switching: true) : nil
             switcherSession = session
-            c.show(items: items, geometry: geometry, layoutSlots: session?.slots ?? [], instant: instant)
+            c.show(items: items, geometry: geometry, layoutSlots: session?.slots ?? [], instant: instant, requiresKeyboardFocus: requiresKeyboardFocus())
         } else {
-            c.show(items: catalog.launcher(targets: preferences.launcherTargets), geometry: geometry, instant: instant)
+            c.show(items: catalog.launcher(targets: preferences.launcherTargets), geometry: geometry, instant: instant, requiresKeyboardFocus: requiresKeyboardFocus())
         }
     }
     func hideWheel(_ wheel: HaloWheel) {

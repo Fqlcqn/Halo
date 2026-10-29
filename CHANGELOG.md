@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.3.2 (21) — focus-preserving wheel input, 2026-10-29
+
+- Launcher, Quitter, and Switcher preserve the current keyboard focus when the authorized global event tap handles input. Previously, every opening unnecessarily made the overlay a key window. The permission-limited monitor fallback retains its key panel so comma and Escape remain usable.
+- Wheel selection responds to delivered mouse movement and all drag events immediately, with the existing 120 Hz common-mode timer retained as a fallback. Both event paths use the current desktop pointer position and leave motion events unchanged. Closing removes monitors and the timer; session guards reject old callbacks and closing panels no longer accept pointer updates.
+- Fixed the first shortcut being ignored after clicking to confirm a menu/toggle wheel with no keys held. Confirmation now waits for key release only if keys are actually still held.
+- Added native regressions for focus preservation, keyboard fallback, all three wheel routes, immediate move/drag selection before timer/reveal, rapid reopening, final sampling and cleanup. No cursor warping, synthetic system motion, private trackpad controls or preference changes.
+- Investigated a sideways-thumb cursor pause specifically after wheel opening. The unnecessary focus transition is removed, but physical thumb/contact recognition is not reproducible by synthetic tests; this release does not claim a confirmed hardware-level fix. See Docs/POINTER_INPUT.md for evidence and acceptance steps.
+
 ## 1.3.1 (20) — Dock-style window reopening, 2026-10-14
 
 - Launcher and Switcher now send the standard macOS Dock reopen event to a selected running app, in addition to bringing its windows forward. Apps can recreate their usual window/start screen after the last window closes or restore a minimized window according to their own Dock behavior.

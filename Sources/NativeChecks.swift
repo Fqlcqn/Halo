@@ -64,6 +64,69 @@ import SwiftUI
         controller.safeMode = true
         let items = (0..<8).map { WheelItem(id:"fixture:\($0)",name:"Fixture \($0)",icon:NSImage(size:NSSize(width:58,height:58)),action:.launch(URL(fileURLWithPath:"/nonexistent-harmless-fixture.app"), bundleIdentifier: "fixture.\($0)")) }
         let center = NSScreen.main.map { CGPoint(x:$0.frame.midX,y:$0.frame.midY) } ?? CGPoint(x:400,y:400)
+        // Synthetic positions and in-process events only: never move the real
+        // cursor, post system input, or select a live application.
+        var pointer = center
+        var samples = 0
+        let responsive = WheelController(pointerLocation: { samples += 1; return pointer })
+        responsive.safeMode = true
+        let focus = NSWindow(contentRect: NSRect(x: center.x, y: center.y, width: 160, height: 100),
+                             styleMask: [.titled], backing: .buffered, defer: false)
+        focus.isReleasedWhenClosed = false
+        focus.makeKeyAndOrderFront(nil)
+        NSApp.activate(ignoringOtherApps: true)
+        await settle()
+        expect(focus.isKeyWindow, "Focus fixture starts key")
+        for instant in [false, true] {
+            for quitter in [false, true] {
+                focus.makeKeyAndOrderFront(nil)
+                pointer = center
+                responsive.show(items: items, geometry: WheelGeometry(quitter: quitter), center: center,
+                                instant: instant, requiresKeyboardFocus: false)
+                expect(focus.isKeyWindow && responsive.panel?.isKeyWindow == false,
+                       "Authorized wheel preserves focus (instant=\(instant), quitter=\(quitter), focusKey=\(focus.isKeyWindow), wheelKey=\(responsive.panel?.isKeyWindow == true))")
+                expect(responsive.panel?.canBecomeKey == false, "Clicking an authorized wheel cannot take key focus")
+                expect(responsive.state.selected == nil, "Stationary contact starts neutral")
+                for type in [NSEvent.EventType.mouseMoved, .leftMouseDragged, .rightMouseDragged, .otherMouseDragged] {
+                    pointer = CGPoint(x: center.x + 120, y: center.y)
+                    let event = NSEvent.mouseEvent(with: type, location: .zero, modifierFlags: [.function, .control],
+                                                  timestamp: ProcessInfo.processInfo.systemUptime,
+                                                  windowNumber: responsive.panel!.windowNumber, context: nil,
+                                                  eventNumber: 0, clickCount: 0, pressure: 0)!
+                    NSApp.sendEvent(event)
+                    expect(responsive.state.selected == (quitter ? 6 : 2),
+                           "Move/drag selects in the delivery turn before a timer or reveal, using desktop coordinates")
+                    pointer = center
+                    NSApp.sendEvent(event)
+                    expect(responsive.state.selected == nil, "Returning to center clears selection immediately")
+                }
+                pointer = CGPoint(x: center.x - 120, y: center.y)
+                responsive.updateSelection()
+                expect(responsive.takeSelection()?.id == (quitter ? "fixture:2" : "fixture:6"),
+                       "Final synchronous sample selects the latest position")
+                responsive.hide()
+                let before = samples
+                responsive.updateSelection()
+                expect(samples == before, "A closing visible panel cannot sample or select again")
+                await settle()
+                expect(samples == before, "Hidden sessions remove all pointer monitors and polling")
+            }
+        }
+        pointer = center
+        responsive.show(items: items, geometry: WheelGeometry(), center: center, requiresKeyboardFocus: true)
+        expect(responsive.panel?.isKeyWindow == true, "Permission fallback still accepts native keyboard focus")
+        responsive.hide(immediately: true)
+        focus.makeKeyAndOrderFront(nil)
+        for _ in 0..<50 {
+            responsive.show(items: items, geometry: WheelGeometry(), center: center, requiresKeyboardFocus: false)
+            responsive.hide(immediately: true)
+        }
+        responsive.show(items: items, geometry: WheelGeometry(), center: center, requiresKeyboardFocus: false)
+        pointer = CGPoint(x: center.x + 120, y: center.y)
+        await settle()
+        expect(responsive.state.selected == 2, "Fallback timer catches movement without a delivered event after rapid reopen")
+        responsive.hide(immediately: true)
+        focus.close()
         for _ in 0..<100 {
             controller.show(items: items, geometry: WheelGeometry(), center: center, trackMouse: false, instant: true)
             expect(controller.state.revealed && controller.state.instantTransitions, "Less animation reveals immediately")
@@ -177,6 +240,16 @@ import SwiftUI
         driver.quitter.onKeyEvent = { localRuntime.handleWheelKeyEvent($0) }
         driver.switcher.onKeyEvent = { localRuntime.handleWheelKeyEvent($0) }
         localRuntime.engine.config.switcherEnabled = true
+        driver.requiresKeyboardFocus = { false }
+        for wheel in [HaloWheel.launcher, HaloWheel.quitter, HaloWheel.switcher] {
+            driver.showWheel(wheel)
+            expect(driver.controller(wheel).panel?.canBecomeKey == false,
+                   "Every coordinator route honors focus-preserving input")
+        }
+        for wheel in [HaloWheel.launcher, HaloWheel.quitter, HaloWheel.switcher] {
+            driver.controller(wheel).hide(immediately: true)
+        }
+        driver.requiresKeyboardFocus = { true }
         for wheel in [HaloWheel.launcher, HaloWheel.quitter, HaloWheel.switcher] {
             localRuntime.engine.update([], at: 10)
             let chord = localRuntime.engine.config.chord(for: wheel)! as! Set<NSNumber>

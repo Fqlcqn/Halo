@@ -11,7 +11,7 @@ shortcuts, animation, and haptics.
 
 ## Install
 
-Requires **macOS 26+**, Apple silicon or Intel. Download `Halo-1.3.1-macOS.zip`
+Requires **macOS 26+**, Apple silicon or Intel. Download `Halo-1.3.2-macOS.zip`
 from this repository's Releases, unzip, move Halo.app to Applications, and open
 it. Quit older Halo copies first. There is no account, subscription, telemetry,
 or automatic updater.
@@ -80,6 +80,9 @@ leaves Settings usable and affected actions report errors.
 
 Less animation in Advanced shows/hides wheels instantly; it is off by default.
 The default reveal gently fades and expands into place while accepting selection immediately.
+Wheels preserve the foreground keyboard focus when global shortcut capture is available,
+and react to pointer movement and dragging without waiting for a polling tick.
+See [pointer-input investigation](Docs/POINTER_INPUT.md) for thumb-specific testing and limits.
 Each preview has its own Preview haptics control, independent of wheel haptics.
 Settings save as controls change. Exported settings may contain local paths and
 bookmarks; review before sharing.
