@@ -16,7 +16,11 @@ import Foundation
         _ = flick.sample(point: radial(300), time: 0.32)
         expect(flick.requested, "A strong second stroke after a stop expands")
         _ = flick.sample(point: radial(280), time: 0.36)
-        expect(!flick.requested, "Retreat cancels pending capture")
+        expect(flick.requested, "Moving back toward a pending preview preserves the request")
+        var tangent = WindowPull(point: radial(1600), time: 0)
+        _ = tangent.sample(point: CGPoint(x: 1600, y: 12), time: 0.14)
+        _ = tangent.sample(point: CGPoint(x: 1600, y: 43), time: 0.19)
+        expect(tangent.requested, "Far tangential second stroke uses cursor displacement")
         var drift = WindowPull(point: radial(123), time: 0)
         for step in 1...24 {
             _ = drift.sample(point: radial(123 + Double(step)*2), time: 0.18 + Double(step)*0.012)

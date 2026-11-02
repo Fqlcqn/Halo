@@ -34,45 +34,29 @@ struct WindowArc {
 
 struct WindowPull {
     private var anchor: CGPoint
-    private var anchorDistance: Double
     private var anchorTime: Double
-    private var stroke: (start: Double, time: Double)?
-    private var peak: Double
+    private var stroke: (origin: CGPoint, time: Double)?
     private(set) var requested = false
 
     init(point: CGPoint, time: Double) {
         anchor = point
-        anchorDistance = hypot(point.x, point.y)
-        peak = anchorDistance
         anchorTime = time
     }
 
-    // The pointer must settle in a three-point neighborhood before the
-    // outward stroke. Moving sideways through a sector never counts as rest.
+    // Work in pointer coordinates: an equally fast diagonal or tangential
+    // second stroke counts just as much when the wheel is far away.
     mutating func sample(point: CGPoint, time now: Double) -> Double {
-        let distance = hypot(point.x, point.y)
-        if requested && distance < peak - 12 {
-            requested = false
-            stroke = nil
-        }
-        if hypot(point.x - anchor.x, point.y - anchor.y) > 3 {
-            if now - anchorTime >= 0.12 {
-                stroke = distance > anchorDistance ? (anchorDistance, now) : nil
+        if hypot(point.x - anchor.x, point.y - anchor.y) > 4 {
+            if now - anchorTime >= 0.10 {
+                stroke = (anchor, now)
             }
             anchor = point
             anchorTime = now
-            anchorDistance = distance
         }
-        if let stroke, now - stroke.time > 0.09 || distance < stroke.start - 3 {
-            self.stroke = nil
-        }
-        guard let stroke else { return 0 }
-        let travel = max(0, distance - stroke.start)
-        if travel >= 44 && !requested {
-            requested = true
-            peak = distance
-        }
-        if requested { peak = max(peak, distance) }
-        return 19 * (1 - exp(-travel / 24))
+        if let stroke, now - stroke.time > 0.10 { self.stroke = nil }
+        guard let stroke else { return requested ? 20 : 0 }
+        let travel = hypot(point.x - stroke.origin.x, point.y - stroke.origin.y)
+        if travel >= 40 { requested = true }
+        return 24 * (1 - exp(-travel / 25))
     }
 }

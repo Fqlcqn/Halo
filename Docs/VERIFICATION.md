@@ -1,5 +1,10 @@
 # Verification record
 
+## November 2, 2026 — 1.4.3 (25) arc boundary and cursor stroke
+
+- The production controller fixture opens beyond a finite reach, moves outward to 1,100 points, comes back to select a window at 185 points, stays open at the 150-point rim, and collapses at 149 points. The gesture test also covers a far-away tangential stroke.
+- Verification passed 18,658 geometry and preference checks, 4,106 native checks, and 28 disposable app reopen checks. The live capture-and-raise fixture skipped because the debug process lacked permission. Physical gesture feel and spring timing need hands-on acceptance.
+
 ## November 2, 2026 — 1.4.2 (24) deliberate window picker
 
 - Verification passed 18,657 geometry and preference checks, 4,109 native checks, and 28 disposable app reopen checks. Added coverage for slight nudges, slow drift, a firm second stroke, single-window fallback, far-distance retreat, and independent wheel preferences.

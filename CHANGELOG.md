@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.4.3 (25) — window arc navigation
+
+- Move inward from any distance to select a preview. The arc retracts when the pointer crosses inside the main wheel’s outer rim.
+- The second stroke uses cursor displacement from the pause point, including diagonal movement and first selection beyond a finite launch reach.
+- The icon pulls outward with a slower damped spring, holds tension during the reveal, and settles back on collapse.
+
 ## 1.4.2 (24) — deliberate window picking
 
 - Require multiple selectable windows and a distinct pause followed by a firm outward stroke. A deliberate inward movement retracts the picker even when far beyond the wheel.

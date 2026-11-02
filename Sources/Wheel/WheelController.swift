@@ -28,7 +28,7 @@ final class WheelPanel: NSPanel {
     var dynamicIconMovement = false
     var windowPickerEnabled = false
     private var pull: WindowPull?
-    private var farthestPreviewDistance = 0.0
+    private var previousPreviewRadius = 0.0
     private var previewTask: Task<Void, Never>?
     var loadPreviews: (NSRunningApplication) async -> [WindowPreview] = { await WindowPreview.load(app: $0) }
     private var preparedPreviews: [WindowPreview] = []
@@ -145,13 +145,15 @@ final class WheelPanel: NSPanel {
         guard mouse != lastMouse else { return }
         lastMouse = mouse
         let dx = mouse.x-panel.frame.midX, dy = mouse.y-panel.frame.midY
-        let index = state.selectedIndex(dx: dx, dy: dy)
+        var index = state.selectedIndex(dx: dx, dy: dy)
         let distance = hypot(dx, dy)
         let direction = atan2(-dy, dx)
         let radialPoint = CGPoint(x: dx, y: dy)
         if let arc = state.arc {
-            farthestPreviewDistance = max(farthestPreviewDistance, distance)
-            if distance > farthestPreviewDistance - 30 && distance >= state.geometry.selectionDistance {
+            let rim = state.geometry.diameter / 2
+            let crossedInward = previousPreviewRadius >= rim && distance < rim
+            previousPreviewRadius = distance
+            if !crossedInward {
                 let target = arc.index(distance: distance, direction: direction)
                 if target != state.previewIndex {
                     if target != nil && haptics && !safeMode {
@@ -169,20 +171,15 @@ final class WheelPanel: NSPanel {
                 guard let self, generation == ticket, state.arc == nil else { return }
                 resizePanel(expanded: false)
             }
-            if index == nil { select(nil) }
+            select(index, pointerAngle: direction)
             return
         }
-        // An already-selected app can receive its second push across a finite
-        // reach boundary. Until it opens an arc, release out there stays neutral.
-        if index == nil, windowPickerEnabled, let limit = state.geometry.maximumSelectionDistance,
-           distance > limit, let i = state.selected, state.items.indices.contains(i),
-           previewOwner == state.items[i].id, pull != nil {
-            let bounds = state.sectorBounds(for: i)
-            let offset = WheelGeometry.shortestDelta(from: state.angle(for: i), to: direction)
-            if offset >= -bounds.before && offset <= bounds.after {
-                trackPull(item: state.items[i], point: radialPoint)
-                return
-            }
+        // A finite ordinary launch reach still suppresses release in
+        // takeSelection(). Resolve the picker direction even if the first
+        // pointer event landed beyond that reach.
+        if index == nil, windowPickerEnabled, let limit = state.geometry.maximumSelectionDistance, distance > limit {
+            let scale = (limit + state.geometry.selectionDistance) / (2 * distance)
+            index = state.selectedIndex(dx: dx * scale, dy: dy * scale)
         }
         let lift = state.geometry.iconLift(distance: distance, dynamic: dynamicIconMovement)
         if abs(state.motion.lift - lift) > 0.001 { state.motion.lift = lift }
@@ -248,11 +245,14 @@ final class WheelPanel: NSPanel {
         guard state.revealed, pull?.requested == true, state.previews.isEmpty, preparedPreviews.count >= 2 else { return }
         guard let panel, let lastMouse else { return }
         let distance = hypot(lastMouse.x - panel.frame.midX, lastMouse.y - panel.frame.midY)
-        farthestPreviewDistance = distance
+        previousPreviewRadius = distance
         resizePanel(expanded: true)
-        withAnimation(state.instantTransitions ? nil : .spring(duration: 0.14, bounce: 0.08)) {
+        withAnimation(state.instantTransitions ? nil : .easeOut(duration: 0.19)) {
             state.previews = preparedPreviews
-            state.motion.stretch = 0
+            // Keep tension at the root while the fan opens. This also gives
+            // coalesced second strokes a visible pull instead of resetting
+            // the displacement in the same render pass.
+            state.motion.stretch = min(16, state.geometry.thickness * 0.20)
         }
         if haptics && !safeMode { NSHapticFeedbackManager.defaultPerformer.perform(.alignment, performanceTime: .now) }
         // Set the initial target directly so the snap emits just one haptic.

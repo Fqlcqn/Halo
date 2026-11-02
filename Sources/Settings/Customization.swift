@@ -146,7 +146,7 @@ struct CustomizationPage: View {
                             Toggle("Launcher", isOn: binding(\.windowPreviews))
                             Toggle("Switcher", isOn: binding(\.switcherWindowPreviews))
                         }
-                        Text("Pause on an app with multiple windows, then push firmly outward. Pull back to dismiss.")
+                        Text("Pause on an app with multiple windows, then make a firm second stroke. Cross inside the wheel rim to dismiss.")
                             .font(.caption).foregroundStyle(.secondary)
                         if preferences.windowPreviews || preferences.switcherWindowPreviews {
                             HStack {

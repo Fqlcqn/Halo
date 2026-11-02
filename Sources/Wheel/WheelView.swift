@@ -257,6 +257,8 @@ private struct WheelIcons: View {
                     .offset(x: offset.x + (selected ? cos(state.angle(for: index)) * motion.stretch : 0),
                             y: offset.y + (selected ? sin(state.angle(for: index)) * motion.stretch : 0))
                     .transition(.opacity.combined(with: .scale(scale: 0.85)))
+                    .animation(reduceMotion || state.instantTransitions ? nil :
+                        .spring(response: 0.31, dampingFraction: 0.94), value: motion.stretch)
                     .animation(reduceMotion ? nil : .linear(duration: 1.0 / 120.0), value: motion.lift)
                     .animation(reduceMotion ? nil : .spring(response: 0.16, dampingFraction: 0.86), value: state.selected)
                     .accessibilityAction { activate(index) }

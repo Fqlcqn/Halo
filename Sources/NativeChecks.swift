@@ -200,7 +200,7 @@ import SwiftUI
         responsive.hide(immediately: true)
         for stoppingRadius in [96.0, 940.0] {
             pointer = center
-            let reach = stoppingRadius < 100 ? 100.0 : nil
+            let reach = 100.0
             responsive.show(items: [target] + Array(items.prefix(7)),
                             geometry: WheelGeometry(selectionDistance: 86, maximumSelectionDistance: reach),
                             center: center, instant: true, requiresKeyboardFocus: false)
@@ -210,12 +210,17 @@ import SwiftUI
             pointer.y += 50
             responsive.updateSelection()
             expect(responsive.state.arc?.count == 2, "A second push crosses finite reach or starts far beyond the rim")
-            pointer.y -= 8
+            pointer.y = center.y + 1100
             responsive.updateSelection()
-            expect(responsive.state.arc != nil, "Small inward jitter keeps the arc open")
-            pointer.y -= 24
+            pointer.y = center.y + 185
             responsive.updateSelection()
-            expect(responsive.state.arc == nil, "Clear retreat collapses even far from the rim")
+            expect(responsive.state.arc != nil && responsive.state.previewIndex != nil, "Long inward movement can select a preview")
+            pointer.y = center.y + 150
+            responsive.updateSelection()
+            expect(responsive.state.arc != nil && responsive.state.previewIndex == nil, "Gap and exact launcher rim keep arc open")
+            pointer.y = center.y + 149
+            responsive.updateSelection()
+            expect(responsive.state.arc == nil, "Crossing inside the launcher rim collapses the arc")
             responsive.hide(immediately: true)
         }
         responsive.loadPreviews = { _ in [pair[0]] }

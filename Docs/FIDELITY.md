@@ -2,6 +2,10 @@
 
 Reference: Halo 0.2.1 (6), copied from the former hybrid project's `Latest/Halo.app` at reconstruction time. That historical project is now Halo Legacy; its baseline is preserved separately. Current Halo is entirely source-built. Historical provenance and baseline hashes are in `VERIFICATION.md`. The complete original Swift source was **not** recovered; this is a reconstruction from public API behavior, executable inspection, and visual evidence.
 
+## Window arc boundary (1.4.3)
+
+Inward travel remains available for selecting a preview. Collapse occurs on a crossing from at or outside the wheel radius to inside it. The six-point gap stays neutral. An arc opened inside the rim waits for an actual inward crossing. The picker measures a 40-point second stroke in pointer coordinates within 100 ms after settling for at least 100 ms, independent of absolute radius. The icon’s stretch uses a damped spring and remains partially extended during reveal.
+
 ## Intentional window pulls (1.4.2)
 
 The picker requires two usable snapshots, a 120 ms stop within a three-point neighborhood and a 44-point outward stroke within 90 ms of movement resuming. Returning 30 points from the farthest radius collapses the arc. Its reveal grows radially and angularly from the parent sector and reverses on retreat. Launcher and Switcher each have a setting, with existing preferences preserved on migration.
