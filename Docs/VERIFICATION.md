@@ -1,5 +1,11 @@
 # Verification record
 
+## November 2, 2026 — 1.4.1 (23) window pull and preview rendering
+
+- Verification passed 18,658 geometry and persistence checks, 4,109 native checks, and 28 disposable app reopen checks.
+- Production controller fixtures exercised a short stop-and-go inside the rim with maximum dead zone and finite maximum reach, a push across a 100-point limit, and a push from 940 points with unlimited reach. A continuous initial flick still selected the app normally.
+- The renderer test samples thumbnail pixels near both curved edges and compares the same pixel before and after selection to verify that the highlight appears above the image. The live ScreenCaptureKit/Accessibility fixture skipped for lack of debug-process permissions.
+
 ## November 2, 2026 — 1.4.0 (22) window picker
 
 - The native fixture renders two synthetic thumbnails in the production glass arc. It checks their pixels at both sector centers, hit testing, retreat to neutral and the normal app selection path. Geometry tests cover the angular seam, pull acceleration and a continuous launch flick.

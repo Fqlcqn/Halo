@@ -51,26 +51,33 @@ struct WindowPreview: Identifiable, @unchecked Sendable {
         let eligible = content.windows.filter { $0.owningApplication?.processID == app.processIdentifier && $0.windowLayer == 0 && !$0.frame.isEmpty }
         // SC and AX have no shared public window-ID accessor. Accept only
         // one-to-one matches, even for identical browser titles or stacked windows.
-        let matches = windows.compactMap { element -> (AXUIElement, SCWindow)? in
-            guard let frame = bounds(element) else { return nil }
-            let sameFrame = eligible.filter {
-                abs($0.frame.minX - frame.minX) <= 1 && abs($0.frame.minY - frame.minY) <= 1 &&
-                abs($0.frame.width - frame.width) <= 1 && abs($0.frame.height - frame.height) <= 1
+        let records = windows.map { (element: $0, frame: bounds($0), title: attribute($0, kAXTitleAttribute) as? String) }
+        let matches = records.compactMap { record -> (AXUIElement, SCWindow)? in
+            func sameFrame(_ lhs: CGRect?, _ rhs: CGRect) -> Bool {
+                guard let lhs else { return false }
+                return abs(lhs.minX - rhs.minX) <= 2 && abs(lhs.minY - rhs.minY) <= 2 &&
+                    abs(lhs.width - rhs.width) <= 2 && abs(lhs.height - rhs.height) <= 2
             }
-            let title = attribute(element, kAXTitleAttribute) as? String
-            let titled = sameFrame.filter { title != nil && $0.title == title }
-            let candidates = titled.isEmpty ? sameFrame.filter {
-                title?.isEmpty != false || $0.title?.isEmpty != false
-            } : titled
-            guard candidates.count == 1 else { return nil }
-            return (element, candidates[0])
+            let byFrame = eligible.filter { sameFrame(record.frame, $0.frame) }
+            let byTitle = eligible.filter { record.title?.isEmpty == false && $0.title == record.title }
+            let both = byTitle.filter { sameFrame(record.frame, $0.frame) }
+            if both.count == 1 { return (record.element, both[0]) }
+            if byTitle.count == 1 && records.filter({ $0.title == record.title }).count == 1 &&
+                (byFrame.isEmpty || byFrame.contains(where: { $0.windowID == byTitle[0].windowID })) {
+                return (record.element, byTitle[0])
+            }
+            if byFrame.count == 1 && byTitle.isEmpty &&
+                records.filter({ sameFrame($0.frame, byFrame[0].frame) }).count == 1 {
+                return (record.element, byFrame[0])
+            }
+            return nil
         }
         var previews: [Self] = []
         for (element, window) in matches {
             guard !Task.isCancelled, !app.isTerminated else { return [] }
             guard matches.filter({ $0.1.windowID == window.windowID }).count == 1 else { continue }
             let config = SCStreamConfiguration()
-            let scale = min(1, 256 / max(window.frame.width, window.frame.height))
+            let scale = min(1, 512 / max(window.frame.width, window.frame.height))
             config.width = max(1, Int(window.frame.width * scale))
             config.height = max(1, Int(window.frame.height * scale))
             config.showsCursor = false

@@ -140,13 +140,17 @@ import SwiftUI
         responsive.loadPreviews = { _ in pair }
         let target = WheelItem(id: "preview-fixture", name: "Fixture", icon: nil, action: .activate(app))
         pointer = center
-        responsive.show(items: [target], geometry: WheelGeometry(), center: center, instant: true, requiresKeyboardFocus: false)
+        responsive.show(items: [target] + Array(items.prefix(7)), geometry: WheelGeometry(selectionDistance: 86, maximumSelectionDistance: 2000), center: center, instant: true, requiresKeyboardFocus: false)
         pointer.y += 123
         responsive.updateSelection()
         await settle()
         expect(responsive.state.selected == 0 && responsive.state.arc == nil, "Ordinary hover keeps app selection")
-        pointer.y += 86
-        responsive.updateSelection()
+        // A short second push opens while still INSIDE the wheel radius.
+        for _ in 0..<4 {
+            pointer.y += 4
+            responsive.updateSelection()
+            try? await Task.sleep(for: .milliseconds(7))
+        }
         expect(responsive.state.arc?.count == 2 && responsive.panel!.frame.width > 400, "Outward pull reveals two native sectors")
         let arc = responsive.state.arc!
         for i in pair.indices {
@@ -155,23 +159,59 @@ import SwiftUI
             responsive.updateSelection()
             expect(responsive.state.previewIndex == i, "Arc hit testing follows visible preview")
         }
+        // Inspect unselected image pixels away from the center of the sector.
+        pointer = CGPoint(x: center.x + 180, y: center.y)
+        responsive.updateSelection()
         await settle()
         if let view = responsive.panel?.contentView, let bitmap = view.bitmapImageRepForCachingDisplay(in: view.bounds) {
             view.cacheDisplay(in: view.bounds, to: bitmap)
             for i in pair.indices {
-                let angle = arc.center(i)
-                let radius = (arc.outer + arc.inner)/2
+                for (fraction, radius) in [(0.0, (arc.outer + arc.inner)/2), (0.39, arc.inner + 4), (-0.39, arc.outer - 4)] {
+                    let angle = arc.center(i) + arc.width * fraction
+                    let x = Int((0.5 + radius*cos(angle)/view.bounds.width) * Double(bitmap.pixelsWide))
+                    let y = Int((0.5 + radius*sin(angle)/view.bounds.height) * Double(bitmap.pixelsHigh))
+                    let color = bitmap.colorAt(x: x, y: y)?.usingColorSpace(.deviceRGB)
+                    expect((color?.redComponent ?? 0) > 0.85 && (color?.blueComponent ?? 0) > 0.85 &&
+                           (color?.greenComponent ?? 1) < 0.65, "Thumbnail fills curved sector, including near its corners")
+                }
+            }
+        }
+        // The SelectionBand is drawn above opaque image content. Compare the
+        // same point before and after selection, using the existing native view.
+        if let view = responsive.panel?.contentView {
+            let angle = arc.center(0)
+            let radius = (arc.inner + arc.outer)/2
+            func greenAtCenter() -> CGFloat {
+                let bitmap = view.bitmapImageRepForCachingDisplay(in: view.bounds)!
+                view.cacheDisplay(in: view.bounds, to: bitmap)
                 let x = Int((0.5 + radius*cos(angle)/view.bounds.width) * Double(bitmap.pixelsWide))
                 let y = Int((0.5 + radius*sin(angle)/view.bounds.height) * Double(bitmap.pixelsHigh))
-                let color = bitmap.colorAt(x: x, y: y)?.usingColorSpace(.deviceRGB)
-                expect((color?.redComponent ?? 0) > 0.85 && (color?.blueComponent ?? 0) > 0.85 &&
-                       (color?.greenComponent ?? 1) < 0.5, "Rendered thumbnail is visible at each sector center")
+                return bitmap.colorAt(x: x, y: y)!.usingColorSpace(.deviceRGB)!.greenComponent
             }
+            let unselected = greenAtCenter()
+            pointer = CGPoint(x: center.x + radius*cos(angle), y: center.y - radius*sin(angle))
+            responsive.updateSelection()
+            await settle()
+            expect(abs(greenAtCenter() - unselected) > 0.04, "Selecting a preview visibly highlights its image")
         }
         pointer = center
         responsive.updateSelection()
         expect(responsive.state.arc == nil && responsive.state.selected == nil, "Retreat cancels picker and center release")
         responsive.hide(immediately: true)
+        for stoppingRadius in [96.0, 940.0] {
+            pointer = center
+            let reach = stoppingRadius < 100 ? 100.0 : nil
+            responsive.show(items: [target] + Array(items.prefix(7)),
+                            geometry: WheelGeometry(selectionDistance: 86, maximumSelectionDistance: reach),
+                            center: center, instant: true, requiresKeyboardFocus: false)
+            pointer.y += stoppingRadius
+            responsive.updateSelection()
+            await settle()
+            pointer.y += 15
+            responsive.updateSelection()
+            expect(responsive.state.arc?.count == 2, "A second push crosses finite reach or starts far beyond the rim")
+            responsive.hide(immediately: true)
+        }
         focus.close()
         for _ in 0..<100 {
             controller.show(items: items, geometry: WheelGeometry(), center: center, trackMouse: false, instant: true)

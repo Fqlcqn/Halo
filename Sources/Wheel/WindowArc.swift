@@ -9,52 +9,69 @@ struct WindowArc {
     init(angle: Double, count: Int, parentWidth: Double, geometry: WheelGeometry) {
         self.angle = angle
         self.count = count
-        inner = geometry.diameter / 2 + 3
+        inner = geometry.diameter / 2 + 6
         outer = inner + geometry.thickness
-        width = min(parentWidth, .pi / 4, (.pi * 1.65) / Double(max(count, 1)))
+        width = min(parentWidth, 2 * .pi / Double(max(count, 1)))
     }
     func center(_ index: Int) -> Double {
         angle + (Double(index) - Double(count - 1) / 2) * width
+    }
+    // Bounding rectangle in tangent/radial coordinates, including both
+    // curved edges. Aspect-fill this rectangle before applying the sector mask.
+    var crop: (size: CGSize, radialCenter: Double) {
+        let half = width / 2
+        let base = (half <= .pi/2 ? inner : outer) * cos(half)
+        return (CGSize(width: 2 * outer * sin(min(half, .pi/2)) + 2,
+                       height: outer - base + 2), (outer + base) / 2)
     }
     func index(distance: Double, direction: Double) -> Int? {
         guard distance >= inner, count > 0 else { return nil }
         let offset = WheelGeometry.shortestDelta(from: angle, to: direction) + Double(count) * width / 2
         guard offset >= 0, offset < Double(count) * width else { return nil }
-        return Int(offset / width)
+        return min(count - 1, Int(offset / width))
     }
 }
 
 struct WindowPull {
-    private var origin: Double
-    var previous: Double
-    var time: Double
-    var velocity = 0.0
-    private var armed = false
-    var requested = false
+    private var previous: Double
+    private var time: Double
+    private var lastSpeed = 0.0
+    private var stop: Double?
+    private var peak: Double
+    private(set) var requested = false
+
     init(distance: Double, time: Double) {
-        origin = distance
         previous = distance
+        peak = distance
         self.time = time
     }
-    mutating func sample(distance: Double, time now: Double, rim: Double) -> Double {
-        let dt = max(0.004, now - time)
-        let speed = (distance - previous) / dt
-        // A continuous ballistic launch flick should cross the rim normally.
-        // Arm after a pause or a slowdown over the parent, then respond to a
-        // second outward push. A deliberate steady pull can break through too.
-        if !armed && (dt >= 0.045 || (velocity > 100 && speed < velocity * 0.65) || abs(speed) < 160) {
-            origin = previous
-            armed = true
+
+    // Only moved-pointer samples enter here. A gap between them records
+    // stationary time even when AppKit sends no mouse-moved event at the stop.
+    mutating func sample(distance: Double, time now: Double) -> Double {
+        let dt = max(0.002, now - time)
+        let delta = distance - previous
+        let speed = delta / dt
+        let paused = dt >= 0.038
+        if distance < peak - 8 {
+            requested = false
+            stop = nil
+            peak = distance
         }
-        let travel = max(0, distance - max(origin, rim - 10))
-        let accelerating = speed > 280 && speed > velocity + 65
-        if armed && ((travel >= 24 && accelerating) || travel >= 54) { requested = true }
-        if distance < rim - 8 { requested = false }
-        // A sample after a stationary interval averages away a real flick.
-        if armed && dt >= 0.045 && distance - previous >= 30 && travel >= 24 { requested = true }
-        velocity = speed
+        if !requested && (paused || (lastSpeed > 100 && speed >= 0 && speed < min(110, lastSpeed * 0.35))) {
+            stop = previous
+        }
+        if let stop { self.stop = min(stop, distance) }
+        let travel = max(0, distance - (stop ?? distance))
+        // A train of small packets at steady renewed velocity is still
+        // acceleration from rest. Do not require the *last* packet to accelerate.
+        if travel >= 10 && (speed >= 145 || (paused && delta >= 10)) {
+            requested = true
+        }
         previous = distance
         time = now
-        return 22 * (1 - exp(-travel / 24))
+        lastSpeed = speed
+        peak = max(peak, distance)
+        return 19 * (1 - exp(-travel / 12))
     }
 }

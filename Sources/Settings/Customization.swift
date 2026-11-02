@@ -7,6 +7,12 @@ struct CustomizationPage: View {
     let store: PreferenceStore
     @State private var draft: HaloPreferences
     @State private var message = ""
+    @State private var previewAccess = ""
+    private func refreshPreviewAccess() {
+        let missing = [(AXIsProcessTrusted(), "Accessibility"), (CGPreflightScreenCaptureAccess(), "Screen Recording")]
+            .filter { !$0.0 }.map { $0.1 }
+        previewAccess = missing.isEmpty ? "Window preview access is ready." : "Window previews need " + missing.joined(separator: " and ") + " access for Halo."
+    }
     @State private var wheel = 0
     private var quitter: Bool { wheel == 1 }
     private var switching: Bool { wheel == 2 }
@@ -143,6 +149,11 @@ struct CustomizationPage: View {
                                     NSWorkspace.shared.open(url)
                                 }
                             }.buttonStyle(.glass).disabled(!preferences.windowPreviews)
+                        }
+                        if preferences.windowPreviews {
+                            Text(previewAccess).font(.caption).foregroundStyle(.secondary)
+                                .onAppear { refreshPreviewAccess() }
+                                .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in refreshPreviewAccess() }
                         }
                         Toggle("Less animation", isOn: binding(\.lessAnimation))
                             .help("Show and hide wheels instantly. Off keeps the smooth animation.")

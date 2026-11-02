@@ -28,6 +28,7 @@ final class WheelPanel: NSPanel {
     var dynamicIconMovement = false
     var windowPickerEnabled = false
     private var pull: WindowPull?
+    private var retreatDistance = 0.0
     private var previewTask: Task<Void, Never>?
     var loadPreviews: (NSRunningApplication) async -> [WindowPreview] = { await WindowPreview.load(app: $0) }
     private var preparedPreviews: [WindowPreview] = []
@@ -148,7 +149,7 @@ final class WheelPanel: NSPanel {
         let distance = hypot(dx, dy)
         let direction = atan2(-dy, dx)
         if let arc = state.arc {
-            if distance >= arc.inner - 18 {
+            if distance >= retreatDistance {
                 let target = arc.index(distance: distance, direction: direction)
                 if target != state.previewIndex { state.previewIndex = target }
                 return
@@ -156,7 +157,19 @@ final class WheelPanel: NSPanel {
             resetPicker()
             resizePanel(expanded: false)
         }
-        let lift = state.geometry.iconLift(distance: hypot(dx, dy), dynamic: dynamicIconMovement)
+        // An already-selected app can receive its second push across a finite
+        // reach boundary. Until it opens an arc, release out there stays neutral.
+        if index == nil, windowPickerEnabled, let limit = state.geometry.maximumSelectionDistance,
+           distance > limit, let i = state.selected, state.items.indices.contains(i),
+           previewOwner == state.items[i].id, pull != nil {
+            let bounds = state.sectorBounds(for: i)
+            let offset = WheelGeometry.shortestDelta(from: state.angle(for: i), to: direction)
+            if offset >= -bounds.before && offset <= bounds.after {
+                trackPull(item: state.items[i], distance: distance)
+                return
+            }
+        }
+        let lift = state.geometry.iconLift(distance: distance, dynamic: dynamicIconMovement)
         if abs(state.motion.lift - lift) > 0.001 { state.motion.lift = lift }
         select(index, pointerAngle: direction)
         if windowPickerEnabled, let index, state.items.indices.contains(index) {
@@ -210,7 +223,7 @@ final class WheelPanel: NSPanel {
                 self.openArcIfReady()
             }
         } else if pull != nil {
-            let stretch = pull!.sample(distance: distance, time: now, rim: state.geometry.diameter / 2)
+            let stretch = pull!.sample(distance: distance, time: now)
             if state.motion.stretch != stretch { state.motion.stretch = stretch }
             openArcIfReady()
         }
@@ -218,13 +231,16 @@ final class WheelPanel: NSPanel {
 
     private func openArcIfReady() {
         guard state.revealed, pull?.requested == true, state.previews.isEmpty, !preparedPreviews.isEmpty else { return }
+        guard let panel, let lastMouse else { return }
+        let distance = hypot(lastMouse.x - panel.frame.midX, lastMouse.y - panel.frame.midY)
+        retreatDistance = min(state.geometry.diameter / 2 - 12, distance - 12)
         resizePanel(expanded: true)
         withAnimation(state.instantTransitions ? nil : .spring(duration: 0.14, bounce: 0.08)) {
             state.previews = preparedPreviews
             state.motion.stretch = 0
         }
         if haptics && !safeMode { NSHapticFeedbackManager.defaultPerformer.perform(.alignment, performanceTime: .now) }
-        lastMouse = nil
+        self.lastMouse = nil
         updateSelection()
     }
 
@@ -245,6 +261,8 @@ final class WheelPanel: NSPanel {
     func takeSelection() -> WheelItem? {
         guard canCommit, let index = state.selected, state.items.indices.contains(index) else { return nil }
         canCommit = false
+        if let limit = state.geometry.maximumSelectionDistance, let panel, let lastMouse,
+           hypot(lastMouse.x - panel.frame.midX, lastMouse.y - panel.frame.midY) > limit { return nil }
         return state.items[index]
     }
 

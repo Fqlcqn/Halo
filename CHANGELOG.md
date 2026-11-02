@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.4.1 (23) — stop-and-go window selection
+
+- A short outward push after a pause opens the picker anywhere along the selected app direction, including inside the wheel or beyond the ordinary release limit.
+- Thumbnails fill the outer sectors with tangential crops. The arc fades in across a clear radial gap, and the wheel’s animated selection band sits above the images.
+- Advanced displays the actual Accessibility and Screen Recording status. Window matching also accepts a unique matching title or frame when macOS reports different metadata through its two APIs.
+
 ## 1.4.0 (22) — window previews, 2026-11-02
 
 - Launcher and Switcher can expand a running app into an outer glass arc. Pull through the icon’s elastic resistance, point at a thumbnail, and release to focus that window. Moving inward returns to the parent wheel.

@@ -1,4 +1,5 @@
 import AppKit
+import os
 
 @main @MainActor final class HaloAppDelegate: NSObject, NSApplicationDelegate {
     static var current: HaloAppDelegate?
@@ -59,6 +60,9 @@ import AppKit
             _ = store.save(fixture)
         }
 #endif
+        if !safe && store.value.windowPreviews {
+            Logger(subsystem: "com.maneesh.halo.production", category: "WindowPicker").notice("Preview access at launch: Accessibility=\(AXIsProcessTrusted(), privacy: .public), ScreenRecording=\(CGPreflightScreenCaptureAccess(), privacy: .public)")
+        }
         let coordinator = WheelCoordinator(store: store, safeMode: safe)
         wheels = coordinator
         // Warm the small icon catalog before the first keyboard interaction.

@@ -7,18 +7,20 @@ import Foundation
         let g = WheelGeometry()
         var flick = WindowPull(distance: 90, time: 0)
         for step in 1...8 {
-            _ = flick.sample(distance: 90 + Double(step) * 20, time: Double(step) * 0.008, rim: 150)
+            _ = flick.sample(distance: 90 + Double(step) * 20, time: Double(step) * 0.008)
         }
         expect(!flick.requested, "A single ballistic launcher flick can extend beyond the wheel")
-        _ = flick.sample(distance: 281, time: 0.28, rim: 150)
+        _ = flick.sample(distance: 281, time: 0.28)
         expect(flick.requested, "Pausing beyond the rim and pulling again opens previews")
-        var pull = WindowPull(distance: 116, time: 0)
-        _ = pull.sample(distance: 149, time: 0.09, rim: 150)
-        expect(!pull.requested, "Ordinary selection does not open previews")
-        _ = pull.sample(distance: 171, time: 0.11, rim: 150)
-        expect(pull.requested, "Accelerating outward snaps the arc")
-        _ = pull.sample(distance: 130, time: 0.14, rim: 150)
-        expect(!pull.requested, "Retreat disarms a pending capture")
+        for start in [90.0, 180, 980] {
+            var pull = WindowPull(distance: start, time: 0)
+            for step in 1...4 {
+                _ = pull.sample(distance: start + Double(step) * 4, time: 0.12 + Double(step) * 0.008)
+            }
+            expect(pull.requested, "Stop and go recognizes sustained acceleration from rest regardless of rim")
+            _ = pull.sample(distance: start - 2, time: 0.18)
+            expect(!pull.requested, "Retreat disarms a pending capture")
+        }
         for n in [1, 2, 5, 24] {
             let arc = WindowArc(angle: .pi, count: n, parentWidth: .pi/4, geometry: g)
             for i in 0..<n {

@@ -2,6 +2,10 @@
 
 Reference: Halo 0.2.1 (6), copied from the former hybrid project's `Latest/Halo.app` at reconstruction time. That historical project is now Halo Legacy; its baseline is preserved separately. Current Halo is entirely source-built. Historical provenance and baseline hashes are in `VERIFICATION.md`. The complete original Swift source was **not** recovered; this is a reconstruction from public API behavior, executable inspection, and visual evidence.
 
+## Window picker correction (1.4.1)
+
+The gesture measures the second stroke from its pause point. Once a running app is selected, a 10-point outward acceleration can engage inside or outside the wheel, including across a finite reach boundary. Ordinary out-of-range release stays neutral. The crop uses the sector’s tangent bounding box and an annular mask. A six-point gap and opacity reveal keep the outer arc clear of the parent wheel throughout opening. Each preview uses the parent sector width unless the number of windows would wrap beyond a full turn.
+
 ## Window picker (1.4.0)
 
 Launcher and Switcher retain normal app activation until an outward pull expands the selected app. The window arc uses the same RingSector, glass compositor and SelectionBand as the wheel. Each thumbnail acts on a retained Accessibility window in the selected process. Halo omits unavailable or ambiguous previews. Less animation and Reduce Motion disable the opening transition.
