@@ -5,22 +5,23 @@ import Foundation
         var checks = 0
         func expect(_ condition: Bool, _ message: String) { precondition(condition, message); checks += 1 }
         let g = WheelGeometry()
-        var flick = WindowPull(distance: 90, time: 0)
+        func radial(_ radius: Double) -> CGPoint { CGPoint(x: radius, y: 0) }
+        var flick = WindowPull(point: radial(90), time: 0)
         for step in 1...8 {
-            _ = flick.sample(distance: 90 + Double(step) * 20, time: Double(step) * 0.008)
+            _ = flick.sample(point: radial(90 + Double(step) * 20), time: Double(step) * 0.008)
         }
-        expect(!flick.requested, "A single ballistic launcher flick can extend beyond the wheel")
-        _ = flick.sample(distance: 281, time: 0.28)
-        expect(flick.requested, "Pausing beyond the rim and pulling again opens previews")
-        for start in [90.0, 180, 980] {
-            var pull = WindowPull(distance: start, time: 0)
-            for step in 1...4 {
-                _ = pull.sample(distance: start + Double(step) * 4, time: 0.12 + Double(step) * 0.008)
-            }
-            expect(pull.requested, "Stop and go recognizes sustained acceleration from rest regardless of rim")
-            _ = pull.sample(distance: start - 2, time: 0.18)
-            expect(!pull.requested, "Retreat disarms a pending capture")
+        expect(!flick.requested, "A continuous launcher flick never expands")
+        _ = flick.sample(point: radial(265), time: 0.28)
+        expect(!flick.requested, "A stopped pointer and small nudge do not expand")
+        _ = flick.sample(point: radial(300), time: 0.32)
+        expect(flick.requested, "A strong second stroke after a stop expands")
+        _ = flick.sample(point: radial(280), time: 0.36)
+        expect(!flick.requested, "Retreat cancels pending capture")
+        var drift = WindowPull(point: radial(123), time: 0)
+        for step in 1...24 {
+            _ = drift.sample(point: radial(123 + Double(step)*2), time: 0.18 + Double(step)*0.012)
         }
+        expect(!drift.requested, "Slow drift after a stop cannot expand")
         for n in [1, 2, 5, 24] {
             let arc = WindowArc(angle: .pi, count: n, parentWidth: .pi/4, geometry: g)
             for i in 0..<n {
@@ -37,6 +38,15 @@ import Foundation
                 angle += delta
             }
         }
+        var picker = HaloPreferences()
+        picker.switcherWindowPreviews = false
+        let savedPicker = try! JSONDecoder().decode(HaloPreferences.self, from: JSONEncoder().encode(picker))
+        expect(savedPicker.windowPreviews && !savedPicker.switcherWindowPreviews, "Wheel choices persist independently")
+        var legacyPicker = try! JSONSerialization.jsonObject(with: JSONEncoder().encode(picker)) as! [String: Any]
+        legacyPicker.removeValue(forKey: "switcherWindowPreviews")
+        legacyPicker["windowPreviews"] = false
+        let migratedPicker = try! JSONDecoder().decode(HaloPreferences.self, from: JSONSerialization.data(withJSONObject: legacyPicker))
+        expect(!migratedPicker.switcherWindowPreviews, "Migration preserves disabled window previews")
         var perApp = HaloPreferences()
         perApp.appQuitOverrides = ["example.editor": false, "example.game": true]
         for global in [false, true] {

@@ -242,6 +242,7 @@ struct HaloPreferences: Codable, Equatable {
     var quitterDiameter = 300.0
     var selectionDistance = 86.0
     var maximumSelectionDistance: Double? = nil // nil encodes unlimited selection without non-JSON infinity.
+    var switcherWindowPreviews = true
     var windowPreviews = true
     var dynamicIconMovement = false
     var launcherTargets = LauncherTarget.original
@@ -257,7 +258,7 @@ struct HaloPreferences: Codable, Equatable {
         case lessAnimation, previewHaptics, appQuitOverrides, quitterPreferredAngles, stableQuitterPositions
         case glassFinish, glassAmount, wheelThickness, settingsTint, selectionTint, forceQuitApps
         case version, launcherDiameter, quitterDiameter, selectionDistance, maximumSelectionDistance
-        case windowPreviews, dynamicIconMovement, launcherTargets, haptics, showSettingsOnLaunch
+        case switcherWindowPreviews, windowPreviews, dynamicIconMovement, launcherTargets, haptics, showSettingsOnLaunch
         case showsTrash, highlightsTrash, trashPosition
     }
     init(from decoder: Decoder) throws {
@@ -288,6 +289,7 @@ struct HaloPreferences: Codable, Equatable {
         selectionDistance = try c.decode(Double.self, forKey: .selectionDistance)
         maximumSelectionDistance = try c.decodeIfPresent(Double.self, forKey: .maximumSelectionDistance)
         windowPreviews = try c.decodeIfPresent(Bool.self, forKey: .windowPreviews) ?? true
+        switcherWindowPreviews = try c.decodeIfPresent(Bool.self, forKey: .switcherWindowPreviews) ?? windowPreviews
         dynamicIconMovement = try c.decodeIfPresent(Bool.self, forKey: .dynamicIconMovement) ?? false
         launcherTargets = try c.decode([LauncherTarget].self, forKey: .launcherTargets)
         showsTrash = try c.decodeIfPresent(Bool.self, forKey: .showsTrash) ?? true

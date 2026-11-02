@@ -143,11 +143,11 @@ import SwiftUI
         responsive.show(items: [target] + Array(items.prefix(7)), geometry: WheelGeometry(selectionDistance: 86, maximumSelectionDistance: 2000), center: center, instant: true, requiresKeyboardFocus: false)
         pointer.y += 123
         responsive.updateSelection()
-        await settle()
+        try? await Task.sleep(for: .milliseconds(160))
         expect(responsive.state.selected == 0 && responsive.state.arc == nil, "Ordinary hover keeps app selection")
-        // A short second push opens while still INSIDE the wheel radius.
+        // The second stroke must be deliberate even after settling.
         for _ in 0..<4 {
-            pointer.y += 4
+            pointer.y += 13
             responsive.updateSelection()
             try? await Task.sleep(for: .milliseconds(7))
         }
@@ -206,12 +206,29 @@ import SwiftUI
                             center: center, instant: true, requiresKeyboardFocus: false)
             pointer.y += stoppingRadius
             responsive.updateSelection()
-            await settle()
-            pointer.y += 15
+            try? await Task.sleep(for: .milliseconds(160))
+            pointer.y += 50
             responsive.updateSelection()
             expect(responsive.state.arc?.count == 2, "A second push crosses finite reach or starts far beyond the rim")
+            pointer.y -= 8
+            responsive.updateSelection()
+            expect(responsive.state.arc != nil, "Small inward jitter keeps the arc open")
+            pointer.y -= 24
+            responsive.updateSelection()
+            expect(responsive.state.arc == nil, "Clear retreat collapses even far from the rim")
             responsive.hide(immediately: true)
         }
+        responsive.loadPreviews = { _ in [pair[0]] }
+        pointer = center
+        responsive.show(items: [target], geometry: WheelGeometry(), center: center, instant: true, requiresKeyboardFocus: false)
+        pointer.y += 120
+        responsive.updateSelection()
+        try? await Task.sleep(for: .milliseconds(160))
+        pointer.y += 55
+        responsive.updateSelection()
+        expect(responsive.state.arc == nil && responsive.takeSelection()?.id == target.id,
+               "A single window always takes the ordinary launcher path")
+        responsive.hide(immediately: true)
         focus.close()
         for _ in 0..<100 {
             controller.show(items: items, geometry: WheelGeometry(), center: center, trackMouse: false, instant: true)

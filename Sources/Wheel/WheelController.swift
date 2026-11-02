@@ -28,7 +28,7 @@ final class WheelPanel: NSPanel {
     var dynamicIconMovement = false
     var windowPickerEnabled = false
     private var pull: WindowPull?
-    private var retreatDistance = 0.0
+    private var farthestPreviewDistance = 0.0
     private var previewTask: Task<Void, Never>?
     var loadPreviews: (NSRunningApplication) async -> [WindowPreview] = { await WindowPreview.load(app: $0) }
     private var preparedPreviews: [WindowPreview] = []
@@ -148,14 +148,29 @@ final class WheelPanel: NSPanel {
         let index = state.selectedIndex(dx: dx, dy: dy)
         let distance = hypot(dx, dy)
         let direction = atan2(-dy, dx)
+        let radialPoint = CGPoint(x: dx, y: dy)
         if let arc = state.arc {
-            if distance >= retreatDistance {
+            farthestPreviewDistance = max(farthestPreviewDistance, distance)
+            if distance > farthestPreviewDistance - 30 && distance >= state.geometry.selectionDistance {
                 let target = arc.index(distance: distance, direction: direction)
-                if target != state.previewIndex { state.previewIndex = target }
+                if target != state.previewIndex {
+                    if target != nil && haptics && !safeMode {
+                        NSHapticFeedbackManager.defaultPerformer.perform(.levelChange, performanceTime: .now)
+                    }
+                    state.previewIndex = target
+                }
                 return
             }
-            resetPicker()
-            resizePanel(expanded: false)
+            let ticket = generation
+            let animated = !state.instantTransitions && !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
+            withAnimation(animated ? .easeOut(duration: 0.12) : nil) { resetPicker() }
+            // Leave room for the outgoing arc until its collapse completes.
+            DispatchQueue.main.asyncAfter(deadline: .now() + (animated ? 0.12 : 0)) { [weak self] in
+                guard let self, generation == ticket, state.arc == nil else { return }
+                resizePanel(expanded: false)
+            }
+            if index == nil { select(nil) }
+            return
         }
         // An already-selected app can receive its second push across a finite
         // reach boundary. Until it opens an arc, release out there stays neutral.
@@ -165,7 +180,7 @@ final class WheelPanel: NSPanel {
             let bounds = state.sectorBounds(for: i)
             let offset = WheelGeometry.shortestDelta(from: state.angle(for: i), to: direction)
             if offset >= -bounds.before && offset <= bounds.after {
-                trackPull(item: state.items[i], distance: distance)
+                trackPull(item: state.items[i], point: radialPoint)
                 return
             }
         }
@@ -173,7 +188,7 @@ final class WheelPanel: NSPanel {
         if abs(state.motion.lift - lift) > 0.001 { state.motion.lift = lift }
         select(index, pointerAngle: direction)
         if windowPickerEnabled, let index, state.items.indices.contains(index) {
-            trackPull(item: state.items[index], distance: distance)
+            trackPull(item: state.items[index], point: radialPoint)
         }
     }
 
@@ -195,7 +210,7 @@ final class WheelPanel: NSPanel {
         panel.setFrame(frame, display: true)
     }
 
-    private func trackPull(item: WheelItem, distance: Double) {
+    private func trackPull(item: WheelItem, point: CGPoint) {
         let now = ProcessInfo.processInfo.systemUptime
         if previewOwner != item.id {
             resetPicker()
@@ -210,7 +225,7 @@ final class WheelPanel: NSPanel {
             default: app = nil
             }
             guard let app else { return }
-            pull = WindowPull(distance: distance, time: now)
+            pull = WindowPull(point: point, time: now)
             let load = loadPreviews
             previewTask = Task { [weak self] in
                 // Moving through a sector need not start screen capture.
@@ -219,29 +234,29 @@ final class WheelPanel: NSPanel {
                 let previews = await load(app)
                 guard !Task.isCancelled, let self, self.previewOwner == item.id else { return }
                 self.preparedPreviews = previews
-                if previews.isEmpty { self.pull = nil; self.state.motion.stretch = 0 }
+                if previews.count < 2 { self.pull = nil; self.state.motion.stretch = 0 }
                 self.openArcIfReady()
             }
         } else if pull != nil {
-            let stretch = pull!.sample(distance: distance, time: now)
-            if state.motion.stretch != stretch { state.motion.stretch = stretch }
+            let stretch = pull!.sample(point: point, time: now)
+            if preparedPreviews.count >= 2 && state.motion.stretch != stretch { state.motion.stretch = stretch }
             openArcIfReady()
         }
     }
 
     private func openArcIfReady() {
-        guard state.revealed, pull?.requested == true, state.previews.isEmpty, !preparedPreviews.isEmpty else { return }
+        guard state.revealed, pull?.requested == true, state.previews.isEmpty, preparedPreviews.count >= 2 else { return }
         guard let panel, let lastMouse else { return }
         let distance = hypot(lastMouse.x - panel.frame.midX, lastMouse.y - panel.frame.midY)
-        retreatDistance = min(state.geometry.diameter / 2 - 12, distance - 12)
+        farthestPreviewDistance = distance
         resizePanel(expanded: true)
         withAnimation(state.instantTransitions ? nil : .spring(duration: 0.14, bounce: 0.08)) {
             state.previews = preparedPreviews
             state.motion.stretch = 0
         }
         if haptics && !safeMode { NSHapticFeedbackManager.defaultPerformer.perform(.alignment, performanceTime: .now) }
-        self.lastMouse = nil
-        updateSelection()
+        // Set the initial target directly so the snap emits just one haptic.
+        state.previewIndex = state.arc?.index(distance: distance, direction: atan2(panel.frame.midY - lastMouse.y, lastMouse.x - panel.frame.midX))
     }
 
     func select(_ index: Int?, pointerAngle: Double? = nil) {
@@ -419,7 +434,7 @@ final class WheelPanel: NSPanel {
         c.state.glassAmount = preferences.glassAmount
         c.state.selectionTint = preferences.selectionTint
         c.state.highlightsTrash = preferences.highlightsTrash
-        c.windowPickerEnabled = !isQuitter && !c.safeMode && preferences.windowPreviews && CGPreflightScreenCaptureAccess() && AXIsProcessTrusted()
+        c.windowPickerEnabled = !isQuitter && !c.safeMode && (wheel == .switcher ? preferences.switcherWindowPreviews : preferences.windowPreviews) && CGPreflightScreenCaptureAccess() && AXIsProcessTrusted()
         c.haptics = preferences.haptics
         c.dynamicIconMovement = preferences.dynamicIconMovement
         let geometry = WheelGeometry(diameter: wheel == .switcher ? preferences.switcherDiameter : isQuitter ? preferences.quitterDiameter : preferences.launcherDiameter, selectionDistance: preferences.selectionDistance, maximumSelectionDistance: preferences.maximumSelectionDistance, quitter: isQuitter, trashPosition: preferences.trashPosition, thickness: preferences.wheelThickness)

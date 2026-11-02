@@ -1,5 +1,10 @@
 # Verification record
 
+## November 2, 2026 — 1.4.2 (24) deliberate window picker
+
+- Verification passed 18,657 geometry and preference checks, 4,109 native checks, and 28 disposable app reopen checks. Added coverage for slight nudges, slow drift, a firm second stroke, single-window fallback, far-distance retreat, and independent wheel preferences.
+- Native rendering tests still see thumbnail pixels near both curved edges and the selection highlight above the image. The debug executable lacked permission for the live capture-and-raise fixture. Physical gesture and haptic feel require hands-on testing.
+
 ## November 2, 2026 — 1.4.1 (23) window pull and preview rendering
 
 - Verification passed 18,658 geometry and persistence checks, 4,109 native checks, and 28 disposable app reopen checks.

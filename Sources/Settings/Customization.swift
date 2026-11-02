@@ -9,7 +9,8 @@ struct CustomizationPage: View {
     @State private var message = ""
     @State private var previewAccess = ""
     private func refreshPreviewAccess() {
-        let missing = [(AXIsProcessTrusted(), "Accessibility"), (CGPreflightScreenCaptureAccess(), "Screen Recording")]
+        let control = ProcessInfo.processInfo.operatingSystemVersion.majorVersion >= 27 ? "Device Control and Data Access" : "Accessibility"
+        let missing = [(AXIsProcessTrusted(), control), (CGPreflightScreenCaptureAccess(), "Screen Recording")]
             .filter { !$0.0 }.map { $0.1 }
         previewAccess = missing.isEmpty ? "Window preview access is ready." : "Window previews need " + missing.joined(separator: " and ") + " access for Halo."
     }
@@ -140,21 +141,32 @@ struct CustomizationPage: View {
                         appsOptions.frame(width: 340)
                     }
                 } else {
-                    section("Behavior") {
-                        HStack {
-                            Toggle("Pull for window previews", isOn: binding(\.windowPreviews))
-                            Button("Screen Recording access…") {
-                                if !CGPreflightScreenCaptureAccess() { _ = CGRequestScreenCaptureAccess() }
-                                if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture") {
-                                    NSWorkspace.shared.open(url)
+                    section("Window picker") {
+                        HStack(spacing: 18) {
+                            Toggle("Launcher", isOn: binding(\.windowPreviews))
+                            Toggle("Switcher", isOn: binding(\.switcherWindowPreviews))
+                        }
+                        Text("Pause on an app with multiple windows, then push firmly outward. Pull back to dismiss.")
+                            .font(.caption).foregroundStyle(.secondary)
+                        if preferences.windowPreviews || preferences.switcherWindowPreviews {
+                            HStack {
+                                Text(previewAccess).font(.caption).foregroundStyle(.secondary)
+                                Spacer()
+                                if !AXIsProcessTrusted() || !CGPreflightScreenCaptureAccess() {
+                                    Button("Manage access…") {
+                                        let pane = AXIsProcessTrusted() ? "Privacy_ScreenCapture" : "Privacy_Accessibility"
+                                        if pane == "Privacy_ScreenCapture" { _ = CGRequestScreenCaptureAccess() }
+                                        if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?" + pane) {
+                                            NSWorkspace.shared.open(url)
+                                        }
+                                    }.buttonStyle(.glass)
                                 }
-                            }.buttonStyle(.glass).disabled(!preferences.windowPreviews)
+                            }
+                            .onAppear { refreshPreviewAccess() }
+                            .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in refreshPreviewAccess() }
                         }
-                        if preferences.windowPreviews {
-                            Text(previewAccess).font(.caption).foregroundStyle(.secondary)
-                                .onAppear { refreshPreviewAccess() }
-                                .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in refreshPreviewAccess() }
-                        }
+                    }
+                    section("Behavior") {
                         Toggle("Less animation", isOn: binding(\.lessAnimation))
                             .help("Show and hide wheels instantly. Off keeps the smooth animation.")
                         Toggle("Haptic feedback", isOn: binding(\.haptics))

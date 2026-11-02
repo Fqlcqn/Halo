@@ -11,7 +11,7 @@ shortcuts, animation, and haptics.
 
 ## Install
 
-Requires **macOS 26+**, Apple silicon or Intel. Download `Halo-1.4.1-macOS.zip`
+Requires **macOS 26+**, Apple silicon or Intel. Download `Halo-1.4.2-macOS.zip`
 from this repository's Releases, unzip, move Halo.app to Applications, and open
 it. Quit older Halo copies first. There is no account, subscription, telemetry,
 or automatic updater.
@@ -47,7 +47,7 @@ It lists the same regular running apps as Quitter, including Finder and hidden
 apps, without Trash or background helpers. The frontmost app comes first, followed
 by app name. The list updates when apps open or close.
 
-**Pick a window.** In Advanced, turn on **Pull for window previews** and use **Screen Recording access…** to grant Halo access. Reopen Halo if macOS requests it. With Accessibility also enabled, point at a running app in Launcher or Switcher, then pull farther outward. Pause over the selected app, then push outward again. That second push opens a glass arc of window thumbnails. Point at one and release to bring that window forward. Pull inward to return to the app, or press Escape to cancel. Ordinary release on the app still performs a Dock-style reopen.
+**Pick a window.** In Advanced → Window picker, choose Launcher, Switcher, or both. Apps with at least two selectable windows can expand. Hold the shortcut, settle on the app for a moment, then push firmly outward. Each thumbnail is framed in glass. Crossing into a preview sector gives a haptic when wheel haptics are enabled. Release to focus the window, pull back to collapse the arc, or press Escape to cancel. Advanced shows any missing permission, including Device Control and Data Access on macOS Golden Gate.
 
 Thumbnails are local snapshots for the current selection. Halo offers only windows macOS lets it capture and uniquely associate with an accessible window. An empty or unavailable set leaves ordinary app selection available. The push is measured from the pause point, independently of the wheel radius and maximum selection distance. Advanced shows whether both permissions are ready.
 

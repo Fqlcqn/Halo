@@ -72,10 +72,11 @@ struct WindowPreview: Identifiable, @unchecked Sendable {
             }
             return nil
         }
+        let unique = matches.filter { candidate in matches.filter { $0.1.windowID == candidate.1.windowID }.count == 1 }
+        guard unique.count >= 2 else { return [] }
         var previews: [Self] = []
-        for (element, window) in matches {
+        for (element, window) in unique {
             guard !Task.isCancelled, !app.isTerminated else { return [] }
-            guard matches.filter({ $0.1.windowID == window.windowID }).count == 1 else { continue }
             let config = SCStreamConfiguration()
             let scale = min(1, 512 / max(window.frame.width, window.frame.height))
             config.width = max(1, Int(window.frame.width * scale))

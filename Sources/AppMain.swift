@@ -60,7 +60,7 @@ import os
             _ = store.save(fixture)
         }
 #endif
-        if !safe && store.value.windowPreviews {
+        if !safe && (store.value.windowPreviews || store.value.switcherWindowPreviews) {
             Logger(subsystem: "com.maneesh.halo.production", category: "WindowPicker").notice("Preview access at launch: Accessibility=\(AXIsProcessTrusted(), privacy: .public), ScreenRecording=\(CGPreflightScreenCaptureAccess(), privacy: .public)")
         }
         let coordinator = WheelCoordinator(store: store, safeMode: safe)

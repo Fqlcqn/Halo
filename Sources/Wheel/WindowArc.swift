@@ -33,45 +33,46 @@ struct WindowArc {
 }
 
 struct WindowPull {
-    private var previous: Double
-    private var time: Double
-    private var lastSpeed = 0.0
-    private var stop: Double?
+    private var anchor: CGPoint
+    private var anchorDistance: Double
+    private var anchorTime: Double
+    private var stroke: (start: Double, time: Double)?
     private var peak: Double
     private(set) var requested = false
 
-    init(distance: Double, time: Double) {
-        previous = distance
-        peak = distance
-        self.time = time
+    init(point: CGPoint, time: Double) {
+        anchor = point
+        anchorDistance = hypot(point.x, point.y)
+        peak = anchorDistance
+        anchorTime = time
     }
 
-    // Only moved-pointer samples enter here. A gap between them records
-    // stationary time even when AppKit sends no mouse-moved event at the stop.
-    mutating func sample(distance: Double, time now: Double) -> Double {
-        let dt = max(0.002, now - time)
-        let delta = distance - previous
-        let speed = delta / dt
-        let paused = dt >= 0.038
-        if distance < peak - 8 {
+    // The pointer must settle in a three-point neighborhood before the
+    // outward stroke. Moving sideways through a sector never counts as rest.
+    mutating func sample(point: CGPoint, time now: Double) -> Double {
+        let distance = hypot(point.x, point.y)
+        if requested && distance < peak - 12 {
             requested = false
-            stop = nil
+            stroke = nil
+        }
+        if hypot(point.x - anchor.x, point.y - anchor.y) > 3 {
+            if now - anchorTime >= 0.12 {
+                stroke = distance > anchorDistance ? (anchorDistance, now) : nil
+            }
+            anchor = point
+            anchorTime = now
+            anchorDistance = distance
+        }
+        if let stroke, now - stroke.time > 0.09 || distance < stroke.start - 3 {
+            self.stroke = nil
+        }
+        guard let stroke else { return 0 }
+        let travel = max(0, distance - stroke.start)
+        if travel >= 44 && !requested {
+            requested = true
             peak = distance
         }
-        if !requested && (paused || (lastSpeed > 100 && speed >= 0 && speed < min(110, lastSpeed * 0.35))) {
-            stop = previous
-        }
-        if let stop { self.stop = min(stop, distance) }
-        let travel = max(0, distance - (stop ?? distance))
-        // A train of small packets at steady renewed velocity is still
-        // acceleration from rest. Do not require the *last* packet to accelerate.
-        if travel >= 10 && (speed >= 145 || (paused && delta >= 10)) {
-            requested = true
-        }
-        previous = distance
-        time = now
-        lastSpeed = speed
-        peak = max(peak, distance)
-        return 19 * (1 - exp(-travel / 12))
+        if requested { peak = max(peak, distance) }
+        return 19 * (1 - exp(-travel / 24))
     }
 }

@@ -227,7 +227,8 @@ struct WheelView: View {
                 .opacity(0.65 + 0.35 * (state.glassAmount ?? state.glassFinish.level))
                 .animation(reduceMotion || !state.selectionHasOrigin ? nil : .spring(response: 0.14, dampingFraction: 0.98, blendDuration: 0.04), value: state.selectionAngle)
                 .animation(reduceMotion ? nil : .easeOut(duration: 0.10), value: state.selected != nil)
-            if let arc = state.arc { WindowArcView(state: state, arc: arc) }
+            if let arc = state.arc { WindowArcView(previews: state.previews, previewIndex: state.previewIndex, finish: state.glassFinish,
+                                                        amount: state.glassAmount, tint: state.selectionTint, arc: arc) }
             if showsIcons { WheelIcons(state: state, motion: state.motion, activate: activate) }
         }
         .frame(width: geometry.diameter + 28, height: geometry.diameter + 28)

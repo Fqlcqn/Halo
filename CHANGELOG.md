@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.4.2 (24) — deliberate window picking
+
+- Require multiple selectable windows and a distinct pause followed by a firm outward stroke. A deliberate inward movement retracts the picker even when far beyond the wheel.
+- The arc opens and closes from its app sector. Thumbnails have a small rounded glass bezel, and entering a preview sector plays wheel haptics when enabled.
+- Advanced groups window picker permissions and independent Launcher and Switcher controls. Golden Gate uses the current Device Control and Data Access label.
+
 ## 1.4.1 (23) — stop-and-go window selection
 
 - A short outward push after a pause opens the picker anywhere along the selected app direction, including inside the wheel or beyond the ordinary release limit.
