@@ -1,5 +1,10 @@
 # Verification record
 
+## November 2, 2026 — 1.4.0 (22) window picker
+
+- The native fixture renders two synthetic thumbnails in the production glass arc. It checks their pixels at both sector centers, hit testing, retreat to neutral and the normal app selection path. Geometry tests cover the angular seam, pull acceleration and a continuous launch flick.
+- On the development Mac, `make verify` passed 18,655 geometry/selection/persistence checks, 4,097 native checks, 28 disposable Dock-reopen checks and the shortcut/runtime suites. The permission-gated live thumbnail/raise fixture was skipped because the debug executable lacked required access. Actual Opera window capture, Spaces and physical haptic/gesture feel still need hands-on acceptance.
+
 ## October 29, 2026 — 1.3.2 (21) pointer input
 
 - `make verify` passes shortcut/runtime tests, 18,586 geometry/layout/preferences

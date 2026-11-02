@@ -126,6 +126,52 @@ import SwiftUI
         await settle()
         expect(responsive.state.selected == 2, "Fallback timer catches movement without a delivered event after rapid reopen")
         responsive.hide(immediately: true)
+        // Exercise the actual overlay and pointer lifecycle with synthetic
+        // thumbnails. The fixture never captures or raises a user's window.
+        let pixels = CGContext(data: nil, width: 40, height: 24, bitsPerComponent: 8, bytesPerRow: 160,
+                               space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue)!
+        pixels.setFillColor(red: 1, green: 0, blue: 1, alpha: 1)
+        pixels.fill(CGRect(x: 0, y: 0, width: 40, height: 24))
+        let snapshot = pixels.makeImage()!
+        let app = NSRunningApplication.current
+        let pair = (1...2).map { WindowPreview(id: CGWindowID($0), image: snapshot,
+                                               element: AXUIElementCreateApplication(app.processIdentifier), app: app) }
+        responsive.windowPickerEnabled = true
+        responsive.loadPreviews = { _ in pair }
+        let target = WheelItem(id: "preview-fixture", name: "Fixture", icon: nil, action: .activate(app))
+        pointer = center
+        responsive.show(items: [target], geometry: WheelGeometry(), center: center, instant: true, requiresKeyboardFocus: false)
+        pointer.y += 123
+        responsive.updateSelection()
+        await settle()
+        expect(responsive.state.selected == 0 && responsive.state.arc == nil, "Ordinary hover keeps app selection")
+        pointer.y += 86
+        responsive.updateSelection()
+        expect(responsive.state.arc?.count == 2 && responsive.panel!.frame.width > 400, "Outward pull reveals two native sectors")
+        let arc = responsive.state.arc!
+        for i in pair.indices {
+            let angle = arc.center(i)
+            pointer = CGPoint(x: center.x + 185*cos(angle), y: center.y - 185*sin(angle))
+            responsive.updateSelection()
+            expect(responsive.state.previewIndex == i, "Arc hit testing follows visible preview")
+        }
+        await settle()
+        if let view = responsive.panel?.contentView, let bitmap = view.bitmapImageRepForCachingDisplay(in: view.bounds) {
+            view.cacheDisplay(in: view.bounds, to: bitmap)
+            for i in pair.indices {
+                let angle = arc.center(i)
+                let radius = (arc.outer + arc.inner)/2
+                let x = Int((0.5 + radius*cos(angle)/view.bounds.width) * Double(bitmap.pixelsWide))
+                let y = Int((0.5 + radius*sin(angle)/view.bounds.height) * Double(bitmap.pixelsHigh))
+                let color = bitmap.colorAt(x: x, y: y)?.usingColorSpace(.deviceRGB)
+                expect((color?.redComponent ?? 0) > 0.85 && (color?.blueComponent ?? 0) > 0.85 &&
+                       (color?.greenComponent ?? 1) < 0.5, "Rendered thumbnail is visible at each sector center")
+            }
+        }
+        pointer = center
+        responsive.updateSelection()
+        expect(responsive.state.arc == nil && responsive.state.selected == nil, "Retreat cancels picker and center release")
+        responsive.hide(immediately: true)
         focus.close()
         for _ in 0..<100 {
             controller.show(items: items, geometry: WheelGeometry(), center: center, trackMouse: false, instant: true)

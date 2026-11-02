@@ -5,6 +5,27 @@ import Foundation
         var checks = 0
         func expect(_ condition: Bool, _ message: String) { precondition(condition, message); checks += 1 }
         let g = WheelGeometry()
+        var flick = WindowPull(distance: 90, time: 0)
+        for step in 1...8 {
+            _ = flick.sample(distance: 90 + Double(step) * 20, time: Double(step) * 0.008, rim: 150)
+        }
+        expect(!flick.requested, "A single ballistic launcher flick can extend beyond the wheel")
+        _ = flick.sample(distance: 281, time: 0.28, rim: 150)
+        expect(flick.requested, "Pausing beyond the rim and pulling again opens previews")
+        var pull = WindowPull(distance: 116, time: 0)
+        _ = pull.sample(distance: 149, time: 0.09, rim: 150)
+        expect(!pull.requested, "Ordinary selection does not open previews")
+        _ = pull.sample(distance: 171, time: 0.11, rim: 150)
+        expect(pull.requested, "Accelerating outward snaps the arc")
+        _ = pull.sample(distance: 130, time: 0.14, rim: 150)
+        expect(!pull.requested, "Retreat disarms a pending capture")
+        for n in [1, 2, 5, 24] {
+            let arc = WindowArc(angle: .pi, count: n, parentWidth: .pi/4, geometry: g)
+            for i in 0..<n {
+                expect(arc.index(distance: arc.outer, direction: arc.center(i)) == i, "Arc selection crosses angular seam")
+                expect(arc.index(distance: arc.inner - 1, direction: arc.center(i)) == nil, "Gap stays neutral")
+            }
+        }
         for direction in [-1.0, 1.0] {
             var angle = Double.pi / 2
             for _ in 0..<8 {

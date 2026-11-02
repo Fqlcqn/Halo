@@ -11,7 +11,7 @@ shortcuts, animation, and haptics.
 
 ## Install
 
-Requires **macOS 26+**, Apple silicon or Intel. Download `Halo-1.3.2-macOS.zip`
+Requires **macOS 26+**, Apple silicon or Intel. Download `Halo-1.4.0-macOS.zip`
 from this repository's Releases, unzip, move Halo.app to Applications, and open
 it. Quit older Halo copies first. There is no account, subscription, telemetry,
 or automatic updater.
@@ -46,6 +46,10 @@ launches a stopped app. Right Shift does not trigger its default shortcut.
 It lists the same regular running apps as Quitter, including Finder and hidden
 apps, without Trash or background helpers. The frontmost app comes first, followed
 by app name. The list updates when apps open or close.
+
+**Pick a window.** In Advanced, turn on **Pull for window previews** and use **Screen Recording access…** to grant Halo access. Reopen Halo if macOS requests it. With Accessibility also enabled, point at a running app in Launcher or Switcher, then pull farther outward. A quick accelerating pull or a longer steady pull opens a glass arc of window thumbnails. Point at one and release to bring that window forward. Pull inward to return to the app, or press Escape to cancel. Ordinary release on the app still performs a Dock-style reopen.
+
+Thumbnails are local snapshots for the current selection. Halo offers only windows macOS lets it capture and uniquely associate with an accessible window. An empty or unavailable set leaves ordinary app selection available. A short custom maximum selection distance can prevent reaching the pull threshold.
 
 When a running app is selected in Launcher or Switcher, Halo also sends the
 standard macOS reopen event used by a Dock click. The app can restore or create

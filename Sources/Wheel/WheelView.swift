@@ -24,6 +24,13 @@ struct WheelItem: Identifiable {
 
 @MainActor final class WheelState: ObservableObject {
     let motion = IconMotion()
+    @Published var previews: [WindowPreview] = []
+    @Published var previewIndex: Int?
+    var arc: WindowArc? {
+        guard let selected, !previews.isEmpty else { return nil }
+        let bounds = sectorBounds(for: selected)
+        return WindowArc(angle: angle(for: selected), count: previews.count, parentWidth: bounds.before + bounds.after, geometry: geometry)
+    }
     @Published var glassFinish: WheelGlassFinish = .standard
     @Published var glassAmount: Double?
     @Published var selectionTint = HaloTint.white
@@ -85,6 +92,7 @@ struct WheelItem: Identifiable {
 /// Pointer-distance changes invalidate only the icons, not the native glass.
 @MainActor final class IconMotion: ObservableObject {
     @Published var lift = 8.0
+    @Published var stretch = 0.0
 }
 
 struct RingSector: Shape {
@@ -99,6 +107,15 @@ struct RingSector: Shape {
         path.addArc(center: center, radius: radius * innerRatio, startAngle: .radians(end), endAngle: .radians(start), clockwise: true)
         path.closeSubpath()
         return path
+    }
+}
+
+struct GlassContour<S: Shape>: View {
+    let shape: S
+    var body: some View {
+        shape.stroke(LinearGradient(colors: [.white.opacity(0.18), .white.opacity(0.03), .white.opacity(0.10)],
+                                    startPoint: .topLeading, endPoint: .bottomTrailing), lineWidth: 0.65)
+            .blur(radius: 0.45)
     }
 }
 
@@ -117,23 +134,21 @@ struct RingGlass: View {
                     .frame(width: geometry.diameter, height: geometry.diameter)
             }
             ForEach([geometry.diameter - 0.5, geometry.innerDiameter + 0.5], id: \.self) { size in
-                Circle().stroke(LinearGradient(colors: [.white.opacity(0.18), .white.opacity(0.03), .white.opacity(0.10)],
-                    startPoint: .topLeading, endPoint: .bottomTrailing), lineWidth: 0.65)
-                    .frame(width: size, height: size)
-                    .blur(radius: 0.45)
+                GlassContour(shape: Circle()).frame(width: size, height: size)
             }
         }
     }
 }
 
-private struct SelectionBand: View {
-    let geometry: WheelGeometry
+struct SelectionBand: View {
+    let diameter: Double
+    let innerDiameter: Double
     let angle: Double
     let before: Double
     let after: Double
     let visible: Bool
     let tint: HaloTint
-    var sector: RingSector { RingSector(start: -before, end: after, innerRatio: geometry.innerDiameter / geometry.diameter) }
+    var sector: RingSector { RingSector(start: -before, end: after, innerRatio: innerDiameter / diameter) }
     var body: some View {
         ZStack {
             sector.fill(LinearGradient(colors: [
@@ -141,11 +156,11 @@ private struct SelectionBand: View {
                 Color(red: 0.73, green: 0.91, blue: 0.86).opacity(0.40),
                 Color(red: 0.56, green: 0.78, blue: 0.74).opacity(0.24)
             ], startPoint: .top, endPoint: .bottom)).blendMode(.screen)
-            sector.fill(RadialGradient(colors: [.white.opacity(0.18), .clear], center: .top, startRadius: 12, endRadius: geometry.diameter * 0.42)).blendMode(.screen)
+            sector.fill(RadialGradient(colors: [.white.opacity(0.18), .clear], center: .top, startRadius: 12, endRadius: diameter * 0.42)).blendMode(.screen)
             sector.stroke(LinearGradient(colors: [.white.opacity(0.28), .white.opacity(0.08)], startPoint: .top, endPoint: .bottom), lineWidth: 1.1)
             sector.fill(Color(red: 0.76, green: 0.95, blue: 0.90).opacity(0.22)).blur(radius: 14).blendMode(.screen)
         }
-        .frame(width: geometry.diameter, height: geometry.diameter)
+        .frame(width: diameter, height: diameter)
         .colorMultiply(tint.color)
         .rotationEffect(.radians(angle))
         .opacity(visible ? 1 : 0)
@@ -208,10 +223,11 @@ struct WheelView: View {
             if state.highlightsTrash && state.items.first?.isTrash == true {
                 LockedBand(geometry: geometry, before: trashBounds.0, after: trashBounds.1, angle: state.angle(for: 0))
             }
-            SelectionBand(geometry: geometry, angle: state.selectionAngle, before: selectedBounds.0, after: selectedBounds.1, visible: state.selected != nil, tint: state.selectionTint)
+            SelectionBand(diameter: geometry.diameter, innerDiameter: geometry.innerDiameter, angle: state.selectionAngle, before: selectedBounds.0, after: selectedBounds.1, visible: state.selected != nil, tint: state.selectionTint)
                 .opacity(0.65 + 0.35 * (state.glassAmount ?? state.glassFinish.level))
                 .animation(reduceMotion || !state.selectionHasOrigin ? nil : .spring(response: 0.14, dampingFraction: 0.98, blendDuration: 0.04), value: state.selectionAngle)
                 .animation(reduceMotion ? nil : .easeOut(duration: 0.10), value: state.selected != nil)
+            if let arc = state.arc { WindowArcView(state: state, arc: arc) }
             if showsIcons { WheelIcons(state: state, motion: state.motion, activate: activate) }
         }
         .frame(width: geometry.diameter + 28, height: geometry.diameter + 28)
@@ -237,7 +253,8 @@ private struct WheelIcons: View {
                 let selected = index == state.selected
                 let offset = state.geometry.offset(angle: state.angle(for: index), selected: selected, lift: motion.lift)
                 IconTile(item: item, selected: selected, size: state.geometry.itemSize(count: state.items.count))
-                    .offset(x: offset.x, y: offset.y)
+                    .offset(x: offset.x + (selected ? cos(state.angle(for: index)) * motion.stretch : 0),
+                            y: offset.y + (selected ? sin(state.angle(for: index)) * motion.stretch : 0))
                     .transition(.opacity.combined(with: .scale(scale: 0.85)))
                     .animation(reduceMotion ? nil : .linear(duration: 1.0 / 120.0), value: motion.lift)
                     .animation(reduceMotion ? nil : .spring(response: 0.16, dampingFraction: 0.86), value: state.selected)

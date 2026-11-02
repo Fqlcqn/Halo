@@ -26,6 +26,12 @@ final class WheelPanel: NSPanel {
     var haptics = true
     var safeMode = false
     var dynamicIconMovement = false
+    var windowPickerEnabled = false
+    private var pull: WindowPull?
+    private var previewTask: Task<Void, Never>?
+    var loadPreviews: (NSRunningApplication) async -> [WindowPreview] = { await WindowPreview.load(app: $0) }
+    private var preparedPreviews: [WindowPreview] = []
+    private var previewOwner: String?
     private var lastMouse: CGPoint?
     var onAccessibilitySelect: ((Int) -> Void)?
     var onKeyEvent: ((NSEvent) -> Bool)?
@@ -39,6 +45,7 @@ final class WheelPanel: NSPanel {
         generation += 1
         let ticket = generation
         stopPointerTracking()
+        resetPicker()
         canCommit = true
         lastMouse = nil
         var reset = Transaction(); reset.disablesAnimations = true
@@ -138,13 +145,92 @@ final class WheelPanel: NSPanel {
         lastMouse = mouse
         let dx = mouse.x-panel.frame.midX, dy = mouse.y-panel.frame.midY
         let index = state.selectedIndex(dx: dx, dy: dy)
+        let distance = hypot(dx, dy)
+        let direction = atan2(-dy, dx)
+        if let arc = state.arc {
+            if distance >= arc.inner - 18 {
+                let target = arc.index(distance: distance, direction: direction)
+                if target != state.previewIndex { state.previewIndex = target }
+                return
+            }
+            resetPicker()
+            resizePanel(expanded: false)
+        }
         let lift = state.geometry.iconLift(distance: hypot(dx, dy), dynamic: dynamicIconMovement)
         if abs(state.motion.lift - lift) > 0.001 { state.motion.lift = lift }
-        select(index, pointerAngle: atan2(-dy, dx))
+        select(index, pointerAngle: direction)
+        if windowPickerEnabled, let index, state.items.indices.contains(index) {
+            trackPull(item: state.items[index], distance: distance)
+        }
+    }
+
+    private func resetPicker() {
+        previewTask?.cancel()
+        previewTask = nil
+        previewOwner = nil
+        preparedPreviews = []
+        pull = nil
+        state.previews = []
+        state.previewIndex = nil
+        state.motion.stretch = 0
+    }
+
+    private func resizePanel(expanded: Bool) {
+        guard let panel else { return }
+        let side = expanded ? state.geometry.diameter + 2 * state.geometry.thickness + 20 : state.geometry.panelSize
+        let frame = NSRect(x: panel.frame.midX - side/2, y: panel.frame.midY - side/2, width: side, height: side)
+        panel.setFrame(frame, display: true)
+    }
+
+    private func trackPull(item: WheelItem, distance: Double) {
+        let now = ProcessInfo.processInfo.systemUptime
+        if previewOwner != item.id {
+            resetPicker()
+            previewOwner = item.id
+            let app: NSRunningApplication?
+            switch item.action {
+            case .activate(let running): app = running
+            case .launch(let url, let id):
+                app = NSRunningApplication.runningApplications(withBundleIdentifier: id).first {
+                    !$0.isTerminated && $0.bundleURL?.standardizedFileURL.resolvingSymlinksInPath() == url.standardizedFileURL.resolvingSymlinksInPath()
+                }
+            default: app = nil
+            }
+            guard let app else { return }
+            pull = WindowPull(distance: distance, time: now)
+            let load = loadPreviews
+            previewTask = Task { [weak self] in
+                // Moving through a sector need not start screen capture.
+                try? await Task.sleep(for: .milliseconds(35))
+                guard !Task.isCancelled else { return }
+                let previews = await load(app)
+                guard !Task.isCancelled, let self, self.previewOwner == item.id else { return }
+                self.preparedPreviews = previews
+                if previews.isEmpty { self.pull = nil; self.state.motion.stretch = 0 }
+                self.openArcIfReady()
+            }
+        } else if pull != nil {
+            let stretch = pull!.sample(distance: distance, time: now, rim: state.geometry.diameter / 2)
+            if state.motion.stretch != stretch { state.motion.stretch = stretch }
+            openArcIfReady()
+        }
+    }
+
+    private func openArcIfReady() {
+        guard state.revealed, pull?.requested == true, state.previews.isEmpty, !preparedPreviews.isEmpty else { return }
+        resizePanel(expanded: true)
+        withAnimation(state.instantTransitions ? nil : .spring(duration: 0.14, bounce: 0.08)) {
+            state.previews = preparedPreviews
+            state.motion.stretch = 0
+        }
+        if haptics && !safeMode { NSHapticFeedbackManager.defaultPerformer.perform(.alignment, performanceTime: .now) }
+        lastMouse = nil
+        updateSelection()
     }
 
     func select(_ index: Int?, pointerAngle: Double? = nil) {
         guard index != state.selected else { return }
+        if previewOwner != nil { resetPicker() }
         if let index, state.items.indices.contains(index) {
             let target = state.angle(for: index)
             state.selectionHasOrigin = state.selected != nil
@@ -164,6 +250,8 @@ final class WheelPanel: NSPanel {
 
     func replaceItems(_ items: [WheelItem]) {
         guard items.map(\.id) != state.items.map(\.id) else { return }
+        resetPicker()
+        resizePanel(expanded: false)
         let selectedID = state.selected.flatMap { state.items.indices.contains($0) ? state.items[$0].id : nil }
         let next = selectedID.flatMap { id in items.firstIndex { $0.id == id } }
         withAnimation(state.instantTransitions ? nil : .easeOut(duration: 0.12)) {
@@ -177,6 +265,7 @@ final class WheelPanel: NSPanel {
         generation += 1
         let ticket = generation
         canCommit = false
+        resetPicker()
         stopPointerTracking()
         if immediately || state.instantTransitions || !state.presentationReady || NSWorkspace.shared.accessibilityDisplayShouldReduceMotion {
             var transaction = Transaction(); transaction.disablesAnimations = true
@@ -312,6 +401,7 @@ final class WheelPanel: NSPanel {
         c.state.glassAmount = preferences.glassAmount
         c.state.selectionTint = preferences.selectionTint
         c.state.highlightsTrash = preferences.highlightsTrash
+        c.windowPickerEnabled = !isQuitter && !c.safeMode && preferences.windowPreviews && CGPreflightScreenCaptureAccess() && AXIsProcessTrusted()
         c.haptics = preferences.haptics
         c.dynamicIconMovement = preferences.dynamicIconMovement
         let geometry = WheelGeometry(diameter: wheel == .switcher ? preferences.switcherDiameter : isQuitter ? preferences.quitterDiameter : preferences.launcherDiameter, selectionDistance: preferences.selectionDistance, maximumSelectionDistance: preferences.maximumSelectionDistance, quitter: isQuitter, trashPosition: preferences.trashPosition, thickness: preferences.wheelThickness)
@@ -340,6 +430,13 @@ final class WheelPanel: NSPanel {
         let c = controller(wheel)
         if c.state.revealed { _ = transitionIsInstant() }
         c.updateSelection()
+        if !c.state.previews.isEmpty {
+            let target = c.state.previewIndex.flatMap { c.state.previews.indices.contains($0) ? c.state.previews[$0] : nil }
+            c.hide()
+            if wheel == .switcher { switcherSession = nil }
+            if let target, !actions.safeMode { Task { await target.raise() } }
+            return
+        }
         let item = c.takeSelection()
         c.hide()
         if wheel == .quitter { quitterSession = nil }

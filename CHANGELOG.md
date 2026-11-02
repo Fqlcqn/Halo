@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.4.0 (22) — window previews, 2026-11-02
+
+- Launcher and Switcher can expand a running app into an outer glass arc. Pull through the icon’s elastic resistance, point at a thumbnail, and release to focus that window. Moving inward returns to the parent wheel.
+- Preview sectors use the wheel’s glass material, thickness, selection tint and highlight. Capture uses ScreenCaptureKit and window activation uses Accessibility. Thumbnails stay in memory for the selection. Advanced provides the feature switch and Screen Recording permission control.
+
 ## 1.3.2 (21) — focus-preserving wheel input, 2026-10-29
 
 - Launcher, Quitter, and Switcher preserve the current keyboard focus when the authorized global event tap handles input. Previously, every opening unnecessarily made the overlay a key window. The permission-limited monitor fallback retains its key panel so comma and Escape remain usable.

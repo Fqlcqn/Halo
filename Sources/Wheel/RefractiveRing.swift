@@ -26,9 +26,18 @@ struct RefractiveRing: View {
     let thickness: Double
     let finish: WheelGlassFinish
     var amount: Double? = nil
+    var body: some View {
+        WheelGlassSurface(shape: GlassAnnulus(thickness: thickness), diameter: diameter, finish: finish, amount: amount)
+    }
+}
+
+struct WheelGlassSurface<S: Shape>: View {
+    let shape: S
+    let diameter: Double
+    let finish: WheelGlassFinish
+    let amount: Double?
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     var body: some View {
-        let shape = GlassAnnulus(thickness: thickness)
         let level = min(1, max(0, amount ?? finish.level))
         ZStack {
             // Optical material stays light even when the Settings UI is dark.

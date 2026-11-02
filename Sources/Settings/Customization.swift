@@ -135,6 +135,15 @@ struct CustomizationPage: View {
                     }
                 } else {
                     section("Behavior") {
+                        HStack {
+                            Toggle("Pull for window previews", isOn: binding(\.windowPreviews))
+                            Button("Screen Recording access…") {
+                                if !CGPreflightScreenCaptureAccess() { _ = CGRequestScreenCaptureAccess() }
+                                if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture") {
+                                    NSWorkspace.shared.open(url)
+                                }
+                            }.buttonStyle(.glass).disabled(!preferences.windowPreviews)
+                        }
                         Toggle("Less animation", isOn: binding(\.lessAnimation))
                             .help("Show and hide wheels instantly. Off keeps the smooth animation.")
                         Toggle("Haptic feedback", isOn: binding(\.haptics))

@@ -2,6 +2,12 @@
 
 Reference: Halo 0.2.1 (6), copied from the former hybrid project's `Latest/Halo.app` at reconstruction time. That historical project is now Halo Legacy; its baseline is preserved separately. Current Halo is entirely source-built. Historical provenance and baseline hashes are in `VERIFICATION.md`. The complete original Swift source was **not** recovered; this is a reconstruction from public API behavior, executable inspection, and visual evidence.
 
+## Window picker (1.4.0)
+
+Launcher and Switcher retain normal app activation until an outward pull expands the selected app. The window arc uses the same RingSector, glass compositor and SelectionBand as the wheel. Each thumbnail acts on a retained Accessibility window in the selected process. Halo omits unavailable or ambiguous previews. Less animation and Reduce Motion disable the opening transition.
+
+Manual acceptance: open two visually distinct Opera windows. Check an ordinary flick and release, then select Opera and give it a second outward push. Compare both thumbnails to their windows and release on each in turn. Check inward retreat, Escape, rapid wheel handoffs, Screen Recording denial, minimized windows, multiple Spaces and monitor edges. The gesture thresholds and haptic require physical mouse and trackpad testing.
+
 ## Dock-style reopening (1.3.1)
 
 Launcher and Switcher activate the selected running process and send it

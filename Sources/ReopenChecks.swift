@@ -7,6 +7,7 @@ import AppKit
         let pid: Int32, reopens: Int, created: Int
         let visible: Bool, minimized: Bool, hidden: Bool
         let command: String
+        let keyTitle: String
     }
     private struct Failure: Error { let message: String }
     static func run(manifest: URL) async throws -> Int {
@@ -86,6 +87,22 @@ import AppKit
                     try await Task.sleep(for: .milliseconds(150))
                     try expect(snapshot(url)!.reopens == safeBefore, "Safe mode sends no reopen event")
                 }
+            }
+            if AXIsProcessTrusted() && CGPreflightScreenCaptureAccess() {
+                try await command("second", to: urls[0])
+                let windows = await WindowPreview.load(app: apps[0])
+                try expect(windows.count == 2, "Capture both disposable windows")
+                var focused: Set<String> = []
+                for window in windows {
+                    await window.raise()
+                    try await wait { apps[0].isActive && snapshot(urls[0])?.keyTitle.isEmpty == false }
+                    try await Task.sleep(for: .milliseconds(180))
+                    focused.insert(snapshot(urls[0])!.keyTitle)
+                }
+                try expect(focused == ["Halo disposable reopen fixture", "Second fixture window"], "Preview actions focus distinct fixture windows")
+                print("PASS: captured and raised two disposable fixture windows")
+            } else {
+                print("SKIP: live window thumbnails require Accessibility and Screen Recording for this test executable")
             }
             let stopped = apps[0]
             stopped.terminate()

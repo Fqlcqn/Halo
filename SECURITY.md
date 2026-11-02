@@ -21,7 +21,10 @@ time or independent security certification is guaranteed.
   be launched when selected. Exports can contain local paths and bookmarks.
 - System glass composites the backdrop without recording it to disk or
   requesting Screen Recording permission.
-- Safe tests never execute live app or Trash actions. Preserve those safeguards.
+- Window previews use Screen Recording and Accessibility. Halo captures individual
+  windows belonging to the selected process and holds thumbnails in memory until
+  the selection changes or the wheel closes. Preview contents are never written to disk or sent over the network.
+- Safe tests never execute destructive app or Trash actions. Preserve those safeguards.
 
 Only the newest release is maintained. Ad-hoc signatures and checksums do not
 prove publisher identity. Developer ID signing and notarization are recommended

@@ -11,8 +11,10 @@ import AppKit
         let minimized: Bool
         let hidden: Bool
         let command: String
+        let keyTitle: String
     }
     private var window: NSWindow?
+    private var secondWindow: NSWindow?
     private var reopens = 0, created = 0
     private var command = ""
     private var timer: Timer?
@@ -49,6 +51,13 @@ import AppKit
         if next != command {
             command = next
             switch next.split(separator: ":").last {
+            case "second":
+                let second = NSWindow(contentRect: NSRect(x: 380, y: 180, width: 220, height: 130),
+                                      styleMask: [.titled, .closable], backing: .buffered, defer: false)
+                second.title = "Second fixture window"
+                second.isReleasedWhenClosed = false
+                secondWindow = second
+                second.makeKeyAndOrderFront(nil)
             case "close": window?.close(); window = nil
             case "minimize": window?.miniaturize(nil)
             case "hide": NSApp.hide(nil)
@@ -60,7 +69,7 @@ import AppKit
     private func publish() {
         let snapshot = Snapshot(pid: ProcessInfo.processInfo.processIdentifier, reopens: reopens, created: created,
             visible: window?.isVisible == true, minimized: window?.isMiniaturized == true,
-            hidden: NSApp.isHidden, command: command)
+            hidden: NSApp.isHidden, command: command, keyTitle: NSApp.keyWindow?.title ?? "")
         if let data = try? JSONEncoder().encode(snapshot) {
             try? data.write(to: directory.appendingPathComponent("state.json"), options: .atomic)
         }
