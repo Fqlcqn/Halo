@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.4.4 (26) — outward-only window picking
+
+- Require an observed pause outside the wheel followed by a fast outward push. Normal continuous movement, backward strokes, and near-rim selection no longer qualify.
+- Give the Advanced heading more space above Window picker and allow the settings content to scroll if it exceeds the available height.
+
 ## 1.4.3 (25) — window arc navigation
 
 - Move inward from any distance to select a preview. The arc retracts when the pointer crosses inside the main wheel’s outer rim.

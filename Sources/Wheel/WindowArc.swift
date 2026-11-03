@@ -33,30 +33,64 @@ struct WindowArc {
 }
 
 struct WindowPull {
+    private enum Phase {
+        case settling, armed, pushing(deadline: Double), triggered
+    }
+    private var phase: Phase = .settling
+    private let minimumRadius: Double
     private var anchor: CGPoint
-    private var anchorTime: Double
-    private var stroke: (origin: CGPoint, time: Double)?
-    private(set) var requested = false
+    private var since: Double
+    private var lastSample: Double
+    private var peak: Double = 0
+    var requested: Bool { if case .triggered = phase { return true }; return false }
 
-    init(point: CGPoint, time: Double) {
+    init(point: CGPoint, time: Double, wheelRadius: Double) {
+        minimumRadius = wheelRadius + 24
         anchor = point
-        anchorTime = time
+        since = time
+        lastSample = time
     }
 
-    // Work in pointer coordinates: an equally fast diagonal or tangential
-    // second stroke counts just as much when the wheel is far away.
+    private mutating func settle(at point: CGPoint, time: Double) -> Double {
+        phase = .settling
+        anchor = point
+        since = time
+        return 0
+    }
+
     mutating func sample(point: CGPoint, time now: Double) -> Double {
-        if hypot(point.x - anchor.x, point.y - anchor.y) > 4 {
-            if now - anchorTime >= 0.10 {
-                stroke = (anchor, now)
-            }
-            anchor = point
-            anchorTime = now
+        let elapsed = now - lastSample
+        let previousTime = lastSample
+        lastSample = now
+        let radius = hypot(point.x, point.y)
+        // Never infer rest or speed from a gap in event delivery.
+        guard radius >= minimumRadius, elapsed >= 0, elapsed <= 0.055 else {
+            return settle(at: point, time: now)
         }
-        if let stroke, now - stroke.time > 0.10 { self.stroke = nil }
-        guard let stroke else { return requested ? 20 : 0 }
-        let travel = hypot(point.x - stroke.origin.x, point.y - stroke.origin.y)
-        if travel >= 40 { requested = true }
-        return 24 * (1 - exp(-travel / 25))
+        let travel = hypot(point.x - anchor.x, point.y - anchor.y)
+        switch phase {
+        case .settling:
+            guard hypot(anchor.x, anchor.y) >= minimumRadius, travel <= 2 else {
+                return settle(at: point, time: now)
+            }
+            if now - since >= 0.13 { phase = .armed }
+            return 0
+        case .armed:
+            guard travel > 2 else { return 0 }
+            phase = .pushing(deadline: previousTime + 0.10)
+            peak = hypot(anchor.x, anchor.y)
+        case .pushing, .triggered:
+            break
+        }
+        let progress = radius - hypot(anchor.x, anchor.y)
+        guard radius >= peak - 3, progress > 0, progress >= travel * 0.80 else {
+            return settle(at: point, time: now)
+        }
+        peak = max(peak, radius)
+        if case .pushing(let deadline) = phase {
+            guard now <= deadline else { return settle(at: point, time: now) }
+            if progress >= 44 { phase = .triggered }
+        }
+        return 24 * (1 - exp(-progress / 25))
     }
 }

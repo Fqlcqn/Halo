@@ -1,5 +1,10 @@
 # Verification record
 
+## November 2, 2026 — 1.4.4 (26) outward-only picking
+
+- Geometry tests rejected steady slow and fast traces, a missing-sample interval, inward and tangential strokes, and firm pushes originating inside the outside margin. Deliberate outward pushes worked both near that margin and far from the wheel.
+- The native fixture exercised the pointer timer with both finite reach and the new pause gate. Verification passed 18,663 geometry and preference checks, 4,107 native checks, and 28 disposable app reopen checks. Live window capture was skipped for the debug executable because it lacked the required permissions. Physical gesture feel still needs hands-on acceptance.
+
 ## November 2, 2026 — 1.4.3 (25) arc boundary and cursor stroke
 
 - The production controller fixture opens beyond a finite reach, moves outward to 1,100 points, comes back to select a window at 185 points, stays open at the 150-point rim, and collapses at 149 points. The gesture test also covers a far-away tangential stroke.

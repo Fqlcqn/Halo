@@ -52,142 +52,151 @@ struct CustomizationPage: View {
     }
     var body: some View {
         Group {
-            VStack(alignment: .leading, spacing: 16) {
-                if tab == 1 {
-                    HStack(alignment: .top, spacing: 20) {
-                        VStack(alignment: .leading, spacing: 14) {
-                            section("Glass") {
-                                HStack { Text("Wheel finish"); Spacer(); Text(preferences.glassTitle).foregroundStyle(.secondary) }
-                                detentedSlider("Wheel glass", value: binding(\.glassLevel),
-                                    stops: .finish, display: preferences.glassTitle)
-                                HStack { Text("Very Liquid"); Spacer(); Text("Translucent") }
-                                    .overlay(alignment: .leading) {
-                                        GeometryReader { geometry in
-                                            Text("Default").position(x: geometry.size.width * 0.35, y: geometry.size.height / 2)
-                                        }
-                                    }
-                                    .font(.system(size: 10)).foregroundStyle(.secondary)
-                                ColorPicker("Settings tint", selection: tintBinding(\.settingsTint), supportsOpacity: false)
-                                ColorPicker("Selection tint", selection: tintBinding(\.selectionTint), supportsOpacity: false)
-                            }
-                            section("Size & selection") {
-                                sizeControl("Launcher diameter", value: binding(\.launcherDiameter), stops: .diameter)
-                                sizeControl("Quitter diameter", value: binding(\.quitterDiameter), stops: .diameter)
-                                sizeControl("Switcher diameter", value: binding(\.switcherDiameter), stops: .diameter)
-                                sizeControl("Wheel thickness", value: binding(\.wheelThickness), stops: .thickness)
-                                sizeControl("Center dead zone", value: binding(\.selectionDistance), stops: .deadZone)
-                                VStack(spacing: 5) {
-                                    HStack {
-                                        Text("Selection reach"); Spacer()
-                                        Text(reachLabel).monospacedDigit().foregroundStyle(.secondary)
-                                    }
-                                    detentedSlider("Maximum selection distance", value: Binding(
-                                        get: { preferences.maximumSelectionDistance ?? 2100 },
-                                        set: { preferences.maximumSelectionDistance = $0 == 2100 ? nil : $0 }),
-                                        stops: .reach, display: reachLabel)
-                                }
-                                Divider().opacity(0.4)
-                                Toggle("Follow pointer distance", isOn: binding(\.dynamicIconMovement))
-                                    .help("Selected icons glide outward as you move away from the center.")
-                            }
-                            Button("Reset appearance") {
-                                guard confirmReset("Reset appearance?") else { return }
-                                var next = preferences
-                                next.launcherDiameter = 300; next.quitterDiameter = 300; next.switcherDiameter = 300; next.selectionDistance = 86
-                                next.maximumSelectionDistance = nil; next.dynamicIconMovement = false; next.glassFinish = .standard
-                                next.glassAmount = nil; next.wheelThickness = 66
-                                next.settingsTint = .white; next.selectionTint = .white
-                                preferences = next
-                            }.buttonStyle(.borderless).foregroundStyle(.secondary).font(.caption)
-                        }.frame(width: 310)
-                        VStack(spacing: 12) {
-                            wheelPicker
-                            ZStack {
-                                PreviewBackdrop(style: backdrop).allowsHitTesting(false).accessibilityHidden(true)
-                                WheelEditor(preferences: preferencesBinding, quitter: quitter, switching: switching, editable: false,
-                                            previewLimit: 388)
-                            }.frame(height: 400).clipShape(RoundedRectangle(cornerRadius: 18))
-                            SlidingChoiceSwitch(selection: Binding(
-                                get: { PreviewBackdrop.Style.allCases.firstIndex(of: backdrop) ?? 0 },
-                                set: { backdrop = PreviewBackdrop.Style.allCases[$0] }), changed: tick,
-                                labels: PreviewBackdrop.Style.allCases.map(\.rawValue), controlWidth: 280,
-                                accessibilityTitle: "Preview background")
-                            previewHapticsControl
-                            VStack(spacing: 4) {
-                                Text("Live preview · \(Int(diameter)) pt")
-                                    .foregroundStyle(.secondary)
-                                Text(diameter + 56 <= 388
-                                     ? "Actual size · Hover to try selection." : "Scaled to fit · Same proportions as the wheel.")
-                                    .foregroundStyle(.tertiary)
-                            }.font(.caption)
-                        }.frame(maxWidth: .infinity)
-                    }
-                } else if tab == 2 {
-                    HStack {
-                        wheelPicker.frame(width: 280)
-                        Spacer()
-                        previewHapticsControl
-                        Button(action: addApps) { Label("Add apps…", systemImage: "plus") }
-                            .buttonStyle(.glass).disabled(runningWheel || preferences.launcherTargets.count >= 24)
-                    }
-                    HStack(alignment: .center, spacing: 20) {
-                        VStack(spacing: 12) {
-                            WheelEditor(preferences: preferencesBinding, quitter: quitter, switching: switching, editable: true,
-                                        previewLimit: 356)
-                                .frame(height: 380)
-                            Text(switching ? "Preview only · No apps are activated" : quitter ? "Preview only · No apps are quit" : "Drag to reorder · Hover × to remove")
-                                .font(.caption).foregroundStyle(.secondary)
-                        }.frame(maxWidth: .infinity).frame(height: 440)
-                        appsOptions.frame(width: 340)
-                    }
-                } else {
-                    section("Window picker") {
-                        HStack(spacing: 18) {
-                            Toggle("Launcher", isOn: binding(\.windowPreviews))
-                            Toggle("Switcher", isOn: binding(\.switcherWindowPreviews))
-                        }
-                        Text("Pause on an app with multiple windows, then make a firm second stroke. Cross inside the wheel rim to dismiss.")
-                            .font(.caption).foregroundStyle(.secondary)
-                        if preferences.windowPreviews || preferences.switcherWindowPreviews {
-                            HStack {
-                                Text(previewAccess).font(.caption).foregroundStyle(.secondary)
-                                Spacer()
-                                if !AXIsProcessTrusted() || !CGPreflightScreenCaptureAccess() {
-                                    Button("Manage access…") {
-                                        let pane = AXIsProcessTrusted() ? "Privacy_ScreenCapture" : "Privacy_Accessibility"
-                                        if pane == "Privacy_ScreenCapture" { _ = CGRequestScreenCaptureAccess() }
-                                        if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?" + pane) {
-                                            NSWorkspace.shared.open(url)
-                                        }
-                                    }.buttonStyle(.glass)
-                                }
-                            }
-                            .onAppear { refreshPreviewAccess() }
-                            .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in refreshPreviewAccess() }
-                        }
-                    }
-                    section("Behavior") {
-                        Toggle("Less animation", isOn: binding(\.lessAnimation))
-                            .help("Show and hide wheels instantly. Off keeps the smooth animation.")
-                        Toggle("Haptic feedback", isOn: binding(\.haptics))
-                        Toggle("Open Settings at launch", isOn: binding(\.showSettingsOnLaunch))
-                        Toggle("Force quit apps", isOn: binding(\.forceQuitApps))
-                            .help("Off: apps can save or ask before quitting. Finder always closes its windows instead.")
-                    }
-                    section("Customization") {
-                        HStack { Button("Export…", action: exportPreferences); Button("Import…", action: importPreferences) }
-                    }
-                    Text((preferences.forceQuitApps ? "Force quit can lose unsaved changes. " : "Regular quit allows apps to save or ask before closing. ") + "Finder only closes its windows. Empty Trash permanently removes its contents.")
-                        .font(.caption).foregroundStyle(.secondary)
-                    section("Made by") {
-                        Text("Maneesh Getni").font(.system(size: 14, weight: .medium))
-                    }
-                }
-                if !message.isEmpty { Text(message).font(.caption).foregroundStyle(.secondary).accessibilityIdentifier("customization-message") }
-            }.padding(.trailing, 8).padding(.bottom, 16)
-        }.frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            if tab == 3 {
+                ScrollView { settingsContent }
+            } else {
+                settingsContent
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .font(.system(size: 13)).tint(.white).environment(\.colorScheme, .dark)
         .toggleStyle(HaloToggleStyle())
+    }
+
+    private var settingsContent: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            if tab == 1 {
+                HStack(alignment: .top, spacing: 20) {
+                    VStack(alignment: .leading, spacing: 14) {
+                        section("Glass") {
+                            HStack { Text("Wheel finish"); Spacer(); Text(preferences.glassTitle).foregroundStyle(.secondary) }
+                            detentedSlider("Wheel glass", value: binding(\.glassLevel),
+                                stops: .finish, display: preferences.glassTitle)
+                            HStack { Text("Very Liquid"); Spacer(); Text("Translucent") }
+                                .overlay(alignment: .leading) {
+                                    GeometryReader { geometry in
+                                        Text("Default").position(x: geometry.size.width * 0.35, y: geometry.size.height / 2)
+                                    }
+                                }
+                                .font(.system(size: 10)).foregroundStyle(.secondary)
+                            ColorPicker("Settings tint", selection: tintBinding(\.settingsTint), supportsOpacity: false)
+                            ColorPicker("Selection tint", selection: tintBinding(\.selectionTint), supportsOpacity: false)
+                        }
+                        section("Size & selection") {
+                            sizeControl("Launcher diameter", value: binding(\.launcherDiameter), stops: .diameter)
+                            sizeControl("Quitter diameter", value: binding(\.quitterDiameter), stops: .diameter)
+                            sizeControl("Switcher diameter", value: binding(\.switcherDiameter), stops: .diameter)
+                            sizeControl("Wheel thickness", value: binding(\.wheelThickness), stops: .thickness)
+                            sizeControl("Center dead zone", value: binding(\.selectionDistance), stops: .deadZone)
+                            VStack(spacing: 5) {
+                                HStack {
+                                    Text("Selection reach"); Spacer()
+                                    Text(reachLabel).monospacedDigit().foregroundStyle(.secondary)
+                                }
+                                detentedSlider("Maximum selection distance", value: Binding(
+                                    get: { preferences.maximumSelectionDistance ?? 2100 },
+                                    set: { preferences.maximumSelectionDistance = $0 == 2100 ? nil : $0 }),
+                                    stops: .reach, display: reachLabel)
+                            }
+                            Divider().opacity(0.4)
+                            Toggle("Follow pointer distance", isOn: binding(\.dynamicIconMovement))
+                                .help("Selected icons glide outward as you move away from the center.")
+                        }
+                        Button("Reset appearance") {
+                            guard confirmReset("Reset appearance?") else { return }
+                            var next = preferences
+                            next.launcherDiameter = 300; next.quitterDiameter = 300; next.switcherDiameter = 300; next.selectionDistance = 86
+                            next.maximumSelectionDistance = nil; next.dynamicIconMovement = false; next.glassFinish = .standard
+                            next.glassAmount = nil; next.wheelThickness = 66
+                            next.settingsTint = .white; next.selectionTint = .white
+                            preferences = next
+                        }.buttonStyle(.borderless).foregroundStyle(.secondary).font(.caption)
+                    }.frame(width: 310)
+                    VStack(spacing: 12) {
+                        wheelPicker
+                        ZStack {
+                            PreviewBackdrop(style: backdrop).allowsHitTesting(false).accessibilityHidden(true)
+                            WheelEditor(preferences: preferencesBinding, quitter: quitter, switching: switching, editable: false,
+                                        previewLimit: 388)
+                        }.frame(height: 400).clipShape(RoundedRectangle(cornerRadius: 18))
+                        SlidingChoiceSwitch(selection: Binding(
+                            get: { PreviewBackdrop.Style.allCases.firstIndex(of: backdrop) ?? 0 },
+                            set: { backdrop = PreviewBackdrop.Style.allCases[$0] }), changed: tick,
+                            labels: PreviewBackdrop.Style.allCases.map(\.rawValue), controlWidth: 280,
+                            accessibilityTitle: "Preview background")
+                        previewHapticsControl
+                        VStack(spacing: 4) {
+                            Text("Live preview · \(Int(diameter)) pt")
+                                .foregroundStyle(.secondary)
+                            Text(diameter + 56 <= 388
+                                 ? "Actual size · Hover to try selection." : "Scaled to fit · Same proportions as the wheel.")
+                                .foregroundStyle(.tertiary)
+                        }.font(.caption)
+                    }.frame(maxWidth: .infinity)
+                }
+            } else if tab == 2 {
+                HStack {
+                    wheelPicker.frame(width: 280)
+                    Spacer()
+                    previewHapticsControl
+                    Button(action: addApps) { Label("Add apps…", systemImage: "plus") }
+                        .buttonStyle(.glass).disabled(runningWheel || preferences.launcherTargets.count >= 24)
+                }
+                HStack(alignment: .center, spacing: 20) {
+                    VStack(spacing: 12) {
+                        WheelEditor(preferences: preferencesBinding, quitter: quitter, switching: switching, editable: true,
+                                    previewLimit: 356)
+                            .frame(height: 380)
+                        Text(switching ? "Preview only · No apps are activated" : quitter ? "Preview only · No apps are quit" : "Drag to reorder · Hover × to remove")
+                            .font(.caption).foregroundStyle(.secondary)
+                    }.frame(maxWidth: .infinity).frame(height: 440)
+                    appsOptions.frame(width: 340)
+                }
+            } else {
+                section("Window picker") {
+                    HStack(spacing: 18) {
+                        Toggle("Launcher", isOn: binding(\.windowPreviews))
+                        Toggle("Switcher", isOn: binding(\.switcherWindowPreviews))
+                    }
+                    Text("Move beyond the wheel, pause, then push outward to see an app’s windows. Cross back inside the rim to dismiss.")
+                        .font(.caption).foregroundStyle(.secondary)
+                    if preferences.windowPreviews || preferences.switcherWindowPreviews {
+                        HStack {
+                            Text(previewAccess).font(.caption).foregroundStyle(.secondary)
+                            Spacer()
+                            if !AXIsProcessTrusted() || !CGPreflightScreenCaptureAccess() {
+                                Button("Manage access…") {
+                                    let pane = AXIsProcessTrusted() ? "Privacy_ScreenCapture" : "Privacy_Accessibility"
+                                    if pane == "Privacy_ScreenCapture" { _ = CGRequestScreenCaptureAccess() }
+                                    if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?" + pane) {
+                                        NSWorkspace.shared.open(url)
+                                    }
+                                }.buttonStyle(.glass)
+                            }
+                        }
+                        .onAppear { refreshPreviewAccess() }
+                        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in refreshPreviewAccess() }
+                    }
+                }
+                section("Behavior") {
+                    Toggle("Less animation", isOn: binding(\.lessAnimation))
+                        .help("Show and hide wheels instantly. Off keeps the smooth animation.")
+                    Toggle("Haptic feedback", isOn: binding(\.haptics))
+                    Toggle("Open Settings at launch", isOn: binding(\.showSettingsOnLaunch))
+                    Toggle("Force quit apps", isOn: binding(\.forceQuitApps))
+                        .help("Off: apps can save or ask before quitting. Finder always closes its windows instead.")
+                }
+                section("Customization") {
+                    HStack { Button("Export…", action: exportPreferences); Button("Import…", action: importPreferences) }
+                }
+                Text((preferences.forceQuitApps ? "Force quit can lose unsaved changes. " : "Regular quit allows apps to save or ask before closing. ") + "Finder only closes its windows. Empty Trash permanently removes its contents.")
+                    .font(.caption).foregroundStyle(.secondary)
+                section("Made by") {
+                    Text("Maneesh Getni").font(.system(size: 14, weight: .medium))
+                }
+            }
+            if !message.isEmpty { Text(message).font(.caption).foregroundStyle(.secondary).accessibilityIdentifier("customization-message") }
+        }.padding(.trailing, 8).padding(.bottom, 16)
     }
     @ViewBuilder private var appsOptions: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -374,7 +383,8 @@ func addCustomizationPage(_ pointer: UnsafeMutableRawPointer, _ tab: Int) {
     let page = CustomizationPage(tab: tab, store: store)
     let host = CustomizationHost(rootView: page)
     host.sizingOptions = []; host.safeAreaRegions = []
-    host.frame = NSRect(x: 0, y: 46, width: parent.bounds.width, height: parent.bounds.height - 46)
+    let topInset: CGFloat = tab == 3 ? 56 : 46
+    host.frame = NSRect(x: 0, y: topInset, width: parent.bounds.width, height: parent.bounds.height - topInset)
     host.autoresizingMask = [.width, .height]; parent.addSubview(host)
 }
 

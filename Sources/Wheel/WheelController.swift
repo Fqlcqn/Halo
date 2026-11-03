@@ -142,7 +142,14 @@ final class WheelPanel: NSPanel {
     func updateSelection() {
         guard state.revealed, let panel, panel.isVisible else { return }
         let mouse = pointerLocation()
-        guard mouse != lastMouse else { return }
+        if mouse == lastMouse {
+            // The existing polling timer witnesses a stop even when AppKit
+            // delivers no move events. Sample only the active recognizer.
+            if pull != nil && state.previews.isEmpty {
+                samplePull(at: CGPoint(x: mouse.x - panel.frame.midX, y: mouse.y - panel.frame.midY))
+            }
+            return
+        }
         lastMouse = mouse
         let dx = mouse.x-panel.frame.midX, dy = mouse.y-panel.frame.midY
         var index = state.selectedIndex(dx: dx, dy: dy)
@@ -222,7 +229,7 @@ final class WheelPanel: NSPanel {
             default: app = nil
             }
             guard let app else { return }
-            pull = WindowPull(point: point, time: now)
+            pull = WindowPull(point: point, time: now, wheelRadius: state.geometry.diameter / 2)
             let load = loadPreviews
             previewTask = Task { [weak self] in
                 // Moving through a sector need not start screen capture.
@@ -234,11 +241,15 @@ final class WheelPanel: NSPanel {
                 if previews.count < 2 { self.pull = nil; self.state.motion.stretch = 0 }
                 self.openArcIfReady()
             }
-        } else if pull != nil {
-            let stretch = pull!.sample(point: point, time: now)
-            if preparedPreviews.count >= 2 && state.motion.stretch != stretch { state.motion.stretch = stretch }
-            openArcIfReady()
+        } else {
+            samplePull(at: point)
         }
+    }
+
+    private func samplePull(at point: CGPoint) {
+        guard let stretch = pull?.sample(point: point, time: ProcessInfo.processInfo.systemUptime) else { return }
+        if preparedPreviews.count >= 2 && state.motion.stretch != stretch { state.motion.stretch = stretch }
+        openArcIfReady()
     }
 
     private func openArcIfReady() {

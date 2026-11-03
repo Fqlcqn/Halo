@@ -143,9 +143,13 @@ import SwiftUI
         responsive.show(items: [target] + Array(items.prefix(7)), geometry: WheelGeometry(selectionDistance: 86, maximumSelectionDistance: 2000), center: center, instant: true, requiresKeyboardFocus: false)
         pointer.y += 123
         responsive.updateSelection()
-        try? await Task.sleep(for: .milliseconds(160))
+        try? await Task.sleep(for: .milliseconds(200))
         expect(responsive.state.selected == 0 && responsive.state.arc == nil, "Ordinary hover keeps app selection")
-        // The second stroke must be deliberate even after settling.
+        pointer.y += 52
+        responsive.updateSelection()
+        expect(responsive.state.arc == nil, "A firm stroke starting on the wheel cannot open the picker")
+        try? await Task.sleep(for: .milliseconds(200))
+        // A separate outward stroke after settling beyond the rim opens.
         for _ in 0..<4 {
             pointer.y += 13
             responsive.updateSelection()
@@ -198,7 +202,7 @@ import SwiftUI
         responsive.updateSelection()
         expect(responsive.state.arc == nil && responsive.state.selected == nil, "Retreat cancels picker and center release")
         responsive.hide(immediately: true)
-        for stoppingRadius in [96.0, 940.0] {
+        for stoppingRadius in [185.0, 940.0] {
             pointer = center
             let reach = 100.0
             responsive.show(items: [target] + Array(items.prefix(7)),
@@ -206,7 +210,7 @@ import SwiftUI
                             center: center, instant: true, requiresKeyboardFocus: false)
             pointer.y += stoppingRadius
             responsive.updateSelection()
-            try? await Task.sleep(for: .milliseconds(160))
+            try? await Task.sleep(for: .milliseconds(200))
             pointer.y += 50
             responsive.updateSelection()
             expect(responsive.state.arc?.count == 2, "A second push crosses finite reach or starts far beyond the rim")
@@ -226,9 +230,9 @@ import SwiftUI
         responsive.loadPreviews = { _ in [pair[0]] }
         pointer = center
         responsive.show(items: [target], geometry: WheelGeometry(), center: center, instant: true, requiresKeyboardFocus: false)
-        pointer.y += 120
+        pointer.y += 190
         responsive.updateSelection()
-        try? await Task.sleep(for: .milliseconds(160))
+        try? await Task.sleep(for: .milliseconds(200))
         pointer.y += 55
         responsive.updateSelection()
         expect(responsive.state.arc == nil && responsive.takeSelection()?.id == target.id,

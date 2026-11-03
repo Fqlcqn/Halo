@@ -2,6 +2,10 @@
 
 Reference: Halo 0.2.1 (6), copied from the former hybrid project's `Latest/Halo.app` at reconstruction time. That historical project is now Halo Legacy; its baseline is preserved separately. Current Halo is entirely source-built. Historical provenance and baseline hashes are in `VERIFICATION.md`. The complete original Swift source was **not** recovered; this is a reconstruction from public API behavior, executable inspection, and visual evidence.
 
+## Outward gesture (1.4.4)
+
+Arming requires observed pointer samples within two points for 130 ms, at least 24 points beyond the wheel rim. The subsequent stroke must gain 44 points radially within 100 ms and make at least 80% outward progress relative to its displacement. Inward reversal or moving back inside the arming zone disarms pending capture. An already open arc keeps its previous rim-crossing dismissal behavior.
+
 ## Window arc boundary (1.4.3)
 
 Inward travel remains available for selecting a preview. Collapse occurs on a crossing from at or outside the wheel radius to inside it. The six-point gap stays neutral. An arc opened inside the rim waits for an actual inward crossing. The picker measures a 40-point second stroke in pointer coordinates within 100 ms after settling for at least 100 ms, independent of absolute radius. The icon’s stretch uses a damped spring and remains partially extended during reveal.

@@ -6,26 +6,46 @@ import Foundation
         func expect(_ condition: Bool, _ message: String) { precondition(condition, message); checks += 1 }
         let g = WheelGeometry()
         func radial(_ radius: Double) -> CGPoint { CGPoint(x: radius, y: 0) }
-        var flick = WindowPull(point: radial(90), time: 0)
-        for step in 1...8 {
-            _ = flick.sample(point: radial(90 + Double(step) * 20), time: Double(step) * 0.008)
+        func afterStop(at radius: Double) -> WindowPull {
+            var pull = WindowPull(point: radial(radius), time: 0, wheelRadius: 150)
+            for tick in 1...20 {
+                _ = pull.sample(point: radial(radius), time: Double(tick) * 0.008)
+            }
+            return pull
         }
-        expect(!flick.requested, "A continuous launcher flick never expands")
-        _ = flick.sample(point: radial(265), time: 0.28)
-        expect(!flick.requested, "A stopped pointer and small nudge do not expand")
-        _ = flick.sample(point: radial(300), time: 0.32)
-        expect(flick.requested, "A strong second stroke after a stop expands")
-        _ = flick.sample(point: radial(280), time: 0.36)
-        expect(flick.requested, "Moving back toward a pending preview preserves the request")
-        var tangent = WindowPull(point: radial(1600), time: 0)
-        _ = tangent.sample(point: CGPoint(x: 1600, y: 12), time: 0.14)
-        _ = tangent.sample(point: CGPoint(x: 1600, y: 43), time: 0.19)
-        expect(tangent.requested, "Far tangential second stroke uses cursor displacement")
-        var drift = WindowPull(point: radial(123), time: 0)
-        for step in 1...24 {
-            _ = drift.sample(point: radial(123 + Double(step)*2), time: 0.18 + Double(step)*0.012)
+        for start in [125.0, 160, 190, 1600] {
+            var pull = afterStop(at: start)
+            for step in 1...4 {
+                _ = pull.sample(point: radial(start + Double(step) * 12), time: 0.16 + Double(step)*0.012)
+            }
+            expect(pull.requested == (start >= 174), "Only an outside stop plus a fast outward stroke qualifies")
         }
-        expect(!drift.requested, "Slow drift after a stop cannot expand")
+        for direction in [-1.0, 0] {
+            var wrongWay = afterStop(at: 300)
+            for step in 1...5 {
+                let travel = Double(step) * 13
+                let point = CGPoint(x: 300 + direction * travel, y: direction == 0 ? travel : 0)
+                _ = wrongWay.sample(point: point, time: 0.16 + Double(step)*0.01)
+            }
+            expect(!wrongWay.requested, "Backward and sideways strokes cannot open an arc")
+        }
+        var stalled = WindowPull(point: radial(200), time: 0, wheelRadius: 150)
+        _ = stalled.sample(point: radial(270), time: 0.18)
+        expect(!stalled.requested, "Missing samples are not evidence of a stop")
+        for speed in [10.0, 200, 700] {
+            var steady = WindowPull(point: radial(90), time: 0, wheelRadius: 150)
+            var opened = false
+            for tick in 1...2000 {
+                let time = Double(tick) * 0.008
+                _ = steady.sample(point: radial(90 + time*speed), time: time)
+                opened = opened || steady.requested
+            }
+            expect(!opened, "Constant speed never triggers the picker")
+        }
+        var reversePending = afterStop(at: 300)
+        _ = reversePending.sample(point: radial(350), time: 0.18)
+        _ = reversePending.sample(point: radial(340), time: 0.19)
+        expect(!reversePending.requested, "Reversal cancels a request still waiting on previews")
         for n in [1, 2, 5, 24] {
             let arc = WindowArc(angle: .pi, count: n, parentWidth: .pi/4, geometry: g)
             for i in 0..<n {
