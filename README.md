@@ -11,7 +11,7 @@ shortcuts, animation, and haptics.
 
 ## Install
 
-Requires **macOS 26+**, Apple silicon or Intel. Download `Halo-1.4.4-macOS.zip`
+Requires **macOS 26+**, Apple silicon or Intel. Download `Halo-1.4.5-macOS.zip`
 from this repository's Releases, unzip, move Halo.app to Applications, and open
 it. Quit older Halo copies first. There is no account, subscription, telemetry,
 or automatic updater.
@@ -47,7 +47,7 @@ It lists the same regular running apps as Quitter, including Finder and hidden
 apps, without Trash or background helpers. The frontmost app comes first, followed
 by app name. The list updates when apps open or close.
 
-**Pick a window.** In Advanced → Window picker, choose Launcher, Switcher, or both. Apps with at least two selectable windows can expand. Hold the shortcut, move along the app’s direction at least 24 points past the rim, pause there, then make a firm outward push. Each thumbnail is framed in glass. Crossing into a preview sector gives a haptic when wheel haptics are enabled. Release to focus the window, cross inside the main wheel’s outer rim to collapse the arc, or press Escape to cancel. Advanced shows any missing permission, including Device Control and Data Access on macOS Golden Gate.
+**Pick a window.** In Advanced → Window picker, choose Launcher, Switcher, or both. Apps with at least two selectable windows can expand. Hold the shortcut, move along the app’s direction at least 24 points past the rim, pause or slow to a gentle drift there, then make a firm outward push. Switcher divides the app’s sector equally among its windows. Each thumbnail is framed in glass. Crossing into a preview sector gives a haptic when wheel haptics are enabled. Release to focus the window, cross inside the main wheel’s outer rim to collapse the arc, or press Escape to cancel. Advanced shows any missing permission, including Device Control and Data Access on macOS Golden Gate.
 
 Thumbnails are local snapshots for the current selection. Halo offers only windows macOS lets it capture and uniquely associate with an accessible window. An empty or unavailable set leaves ordinary app selection available. Once you pause beyond the rim, the outward push is measured from that point, even if you use a finite maximum launch distance. Advanced shows whether both permissions are ready.
 

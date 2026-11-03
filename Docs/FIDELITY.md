@@ -2,6 +2,10 @@
 
 Reference: Halo 0.2.1 (6), copied from the former hybrid project's `Latest/Halo.app` at reconstruction time. That historical project is now Halo Legacy; its baseline is preserved separately. Current Halo is entirely source-built. Historical provenance and baseline hashes are in `VERIFICATION.md`. The complete original Swift source was **not** recovered; this is a reconstruction from public API behavior, executable inspection, and visual evidence.
 
+## Switcher preview sizing and slow drift (1.4.5)
+
+Switcher partitions the selected sector’s actual angular bounds equally, including uneven stable slots. Launcher retains its existing fan. The pull recognizer’s resting anchor follows up to 48 points per second of drift with the existing two-point jitter allowance. Only the subsequent outward stroke counts toward opening.
+
 ## Outward gesture (1.4.4)
 
 Arming requires observed pointer samples within two points for 130 ms, at least 24 points beyond the wheel rim. The subsequent stroke must gain 44 points radially within 100 ms and make at least 80% outward progress relative to its displacement. Inward reversal or moving back inside the arming zone disarms pending capture. An already open arc keeps its previous rim-crossing dismissal behavior.

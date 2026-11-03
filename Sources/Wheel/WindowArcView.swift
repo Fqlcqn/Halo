@@ -37,7 +37,8 @@ private struct ArcReveal: AnimatableModifier {
         let p = min(1, max(0, progress))
         let radius = arc.inner + (arc.outer - arc.inner) * p
         let span = arc.width * (0.25 + (Double(arc.count) - 0.25) * p)
-        content.mask(RingSector(start: arc.angle - span/2, end: arc.angle + span/2, innerRatio: arc.inner / radius)
+        let center = arc.appAngle + (arc.angle - arc.appAngle) * p
+        content.mask(RingSector(start: center - span/2, end: center + span/2, innerRatio: arc.inner / radius)
             .frame(width: 2 * radius, height: 2 * radius))
             .opacity(min(1, 3 * p))
     }

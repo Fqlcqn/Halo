@@ -42,12 +42,33 @@ import Foundation
             }
             expect(!opened, "Constant speed never triggers the picker")
         }
+        // No stationary samples: glide for longer than the dwell window,
+        // then accelerate immediately from the current (moving) anchor.
+        var glide = WindowPull(point: radial(230), time: 0, wheelRadius: 150)
+        for tick in 1...50 {
+            let t = Double(tick)*0.008
+            _ = glide.sample(point: radial(230 + 40*t), time: t)
+            expect(!glide.requested, "Slow drift alone cannot open")
+        }
+        for tick in 1...5 {
+            _ = glide.sample(point: radial(246 + Double(tick)*10), time: 0.40 + Double(tick)*0.015)
+        }
+        expect(glide.requested, "Slow moving cursor can accelerate outward without a complete stop")
+        for n in [2, 3, 9] {
+            let arc = WindowArc(appAngle: .pi, count: n, bounds: (0.20, 0.65), fitsParent: true, geometry: g)
+            expect(abs(arc.center(0) - arc.width/2 - (.pi - 0.20)) < 1e-9 &&
+                   abs(arc.center(n-1) + arc.width/2 - (.pi + 0.65)) < 1e-9, "Switcher exactly partitions asymmetric parent")
+            expect(arc.index(distance: arc.outer, direction: .pi + 0.66) == nil, "Neighboring app direction is outside child arc")
+            for i in 0..<n {
+                expect(arc.index(distance: arc.outer, direction: arc.center(i)) == i, "Divided Switcher arc hit testing matches render")
+            }
+        }
         var reversePending = afterStop(at: 300)
         _ = reversePending.sample(point: radial(350), time: 0.18)
         _ = reversePending.sample(point: radial(340), time: 0.19)
         expect(!reversePending.requested, "Reversal cancels a request still waiting on previews")
         for n in [1, 2, 5, 24] {
-            let arc = WindowArc(angle: .pi, count: n, parentWidth: .pi/4, geometry: g)
+            let arc = WindowArc(appAngle: .pi, count: n, bounds: (.pi/8, .pi/8), fitsParent: false, geometry: g)
             for i in 0..<n {
                 expect(arc.index(distance: arc.outer, direction: arc.center(i)) == i, "Arc selection crosses angular seam")
                 expect(arc.index(distance: arc.inner - 1, direction: arc.center(i)) == nil, "Gap stays neutral")

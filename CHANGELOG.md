@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.4.5 (27) — compact Switcher previews and slow-drift gestures
+
+- Switcher divides the selected app’s sector among its windows, respecting both edges even in an asymmetric stable layout.
+- A gentle drift followed by an outward acceleration can open the picker without a complete stop. The existing rim clearance, dwell, stroke distance and direction checks still apply.
+
 ## 1.4.4 (26) — outward-only window picking
 
 - Require an observed pause outside the wheel followed by a fast outward push. Normal continuous movement, backward strokes, and near-rim selection no longer qualify.

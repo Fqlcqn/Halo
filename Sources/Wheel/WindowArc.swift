@@ -1,17 +1,22 @@
 import Foundation
 
 struct WindowArc {
+    let appAngle: Double
     let angle: Double
     let count: Int
     let width: Double
     let inner: Double
     let outer: Double
-    init(angle: Double, count: Int, parentWidth: Double, geometry: WheelGeometry) {
-        self.angle = angle
+    init(appAngle: Double, count: Int, bounds: (before: Double, after: Double),
+         fitsParent: Bool, geometry: WheelGeometry) {
+        self.appAngle = appAngle
+        angle = fitsParent ? appAngle + (bounds.after - bounds.before) / 2 : appAngle
         self.count = count
         inner = geometry.diameter / 2 + 6
         outer = inner + geometry.thickness
-        width = min(parentWidth, 2 * .pi / Double(max(count, 1)))
+        let n = Double(max(count, 1))
+        let parentWidth = bounds.before + bounds.after
+        width = fitsParent ? parentWidth / n : min(parentWidth, 2 * .pi / n)
     }
     func center(_ index: Int) -> Double {
         angle + (Double(index) - Double(count - 1) / 2) * width
@@ -58,6 +63,19 @@ struct WindowPull {
         return 0
     }
 
+    // Follow slow drift without letting it accumulate toward the fast push.
+    // The two-point slack still absorbs small tremors around a complete stop.
+    private mutating func followsSlowMotion(point: CGPoint, elapsed: Double, travel: Double) -> Bool {
+        let allowance = 48 * elapsed
+        guard travel <= 2 + allowance else { return false }
+        if travel > 0 {
+            let fraction = min(1, allowance / travel)
+            anchor.x += (point.x - anchor.x) * fraction
+            anchor.y += (point.y - anchor.y) * fraction
+        }
+        return true
+    }
+
     mutating func sample(point: CGPoint, time now: Double) -> Double {
         let elapsed = now - lastSample
         let previousTime = lastSample
@@ -70,13 +88,14 @@ struct WindowPull {
         let travel = hypot(point.x - anchor.x, point.y - anchor.y)
         switch phase {
         case .settling:
-            guard hypot(anchor.x, anchor.y) >= minimumRadius, travel <= 2 else {
+            guard hypot(anchor.x, anchor.y) >= minimumRadius,
+                  followsSlowMotion(point: point, elapsed: elapsed, travel: travel) else {
                 return settle(at: point, time: now)
             }
             if now - since >= 0.13 { phase = .armed }
             return 0
         case .armed:
-            guard travel > 2 else { return 0 }
+            if followsSlowMotion(point: point, elapsed: elapsed, travel: travel) { return 0 }
             phase = .pushing(deadline: previousTime + 0.10)
             peak = hypot(anchor.x, anchor.y)
         case .pushing, .triggered:

@@ -26,10 +26,12 @@ struct WheelItem: Identifiable {
     let motion = IconMotion()
     @Published var previews: [WindowPreview] = []
     @Published var previewIndex: Int?
+    var fitsWindowArcToAppSector = false
     var arc: WindowArc? {
         guard let selected, !previews.isEmpty else { return nil }
         let bounds = sectorBounds(for: selected)
-        return WindowArc(angle: angle(for: selected), count: previews.count, parentWidth: bounds.before + bounds.after, geometry: geometry)
+        return WindowArc(appAngle: angle(for: selected), count: previews.count, bounds: bounds,
+                         fitsParent: fitsWindowArcToAppSector, geometry: geometry)
     }
     @Published var glassFinish: WheelGlassFinish = .standard
     @Published var glassAmount: Double?

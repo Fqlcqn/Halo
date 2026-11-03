@@ -441,6 +441,7 @@ final class WheelPanel: NSPanel {
         for other in [HaloWheel.launcher, .quitter, .switcher] where other != wheel { controller(other).hide(immediately: true) }
         let preferences = store.value
         let c = controller(wheel)
+        c.state.fitsWindowArcToAppSector = wheel == .switcher
         c.state.glassFinish = preferences.glassFinish
         c.state.glassAmount = preferences.glassAmount
         c.state.selectionTint = preferences.selectionTint

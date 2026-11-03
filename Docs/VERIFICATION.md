@@ -1,5 +1,10 @@
 # Verification record
 
+## November 3, 2026 — 1.4.5 (27) Switcher bounds and slow drift
+
+- Focused geometry checks cover a continuous 40 pt/s glide followed by an outward push, and asymmetric Switcher bounds spanning the angular seam with two, three and nine windows. Existing steady-motion rejection and Launcher layout checks passed.
+- 18,734 geometry/preference checks passed. The first native run failed at a focus assertion (neither window was key). The same binary passed all 4,112 native checks and 28 disposable reopen checks on retry. Live thumbnail capture was skipped for lack of debug-process permission.
+
 ## November 2, 2026 — 1.4.4 (26) outward-only picking
 
 - Geometry tests rejected steady slow and fast traces, a missing-sample interval, inward and tangential strokes, and firm pushes originating inside the outside margin. Deliberate outward pushes worked both near that margin and far from the wheel.
