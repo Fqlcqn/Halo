@@ -2,6 +2,16 @@
 
 Reference: Halo 0.2.1 (6), copied from the former hybrid project's `Latest/Halo.app` at reconstruction time. That historical project is now Halo Legacy; its baseline is preserved separately. Current Halo is entirely source-built. Historical provenance and baseline hashes are in `VERIFICATION.md`. The complete original Swift source was **not** recovered; this is a reconstruction from public API behavior, executable inspection, and visual evidence.
 
+## Input corrections (1.4.6)
+
+A complete window ring accumulates shortest angular steps for its selection highlight, including repeated turns across the first/last preview seam. An incomplete fan keeps its existing bounded path. The full-ring seam itself belongs to the first preview rather than becoming neutral.
+
+Slow drift now follows up to 72 points per second, with the existing two-point jitter allowance. The 24-point rim clearance, 130 ms settling interval, 44-point outward stroke within 100 ms and reversal rejection stay unchanged.
+
+Fn state comes only from keycode 63 modifier transitions. Navigation and F-key events can carry the same function flag without physical Fn being held; those snapshots cannot press or release Fn in either shortcut matching or recording. Sleep/session/tap recovery clears the tracked state and requires a fresh Fn press.
+
+The user reproduced the angled-thumb pause while Halo was quit on November 4. The pause therefore occurs independently of Halo. See POINTER_INPUT.md for the scoped finding and workarounds to try.
+
 ## Switcher preview sizing and slow drift (1.4.5)
 
 Switcher partitions the selected sector’s actual angular bounds equally, including uneven stable slots. Launcher retains its existing fan. The pull recognizer’s resting anchor follows up to 48 points per second of drift with the existing two-point jitter allowance. Only the subsequent outward stroke counts toward opening.

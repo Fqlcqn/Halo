@@ -53,7 +53,7 @@ struct WindowArcView: View {
     let arc: WindowArc
     @Environment(\.accessibilityReduceTransparency) private var solid
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @State private var lastIndex = 0
+    @State private var selectionAngle: Double?
 
     var body: some View {
         let size = 2 * arc.outer
@@ -86,7 +86,7 @@ struct WindowArcView: View {
                 .accessibilityElement(children: .ignore)
                 .accessibilityLabel("Window \(i + 1) of \(preview.app.localizedName ?? "app")")
             }
-            let target = arc.center(previewIndex ?? lastIndex)
+            let target = selectionAngle ?? arc.center(previewIndex ?? 0)
             SelectionBand(diameter: size, innerDiameter: 2 * arc.inner, angle: target,
                           before: arc.width / 2, after: arc.width / 2,
                           visible: previewIndex != nil, tint: tint)
@@ -103,7 +103,7 @@ struct WindowArcView: View {
         .mask(RingSector(start: arc.angle - arc.width * Double(arc.count)/2,
                          end: arc.angle + arc.width * Double(arc.count)/2, innerRatio: ratio))
         .onChange(of: previewIndex, initial: true) { _, next in
-            if let next { lastIndex = next }
+            if let next { selectionAngle = arc.highlightAngle(for: next, from: selectionAngle) }
         }
         .transition(.modifier(active: ArcReveal(arc: arc, progress: 0), identity: ArcReveal(arc: arc, progress: 1)))
     }

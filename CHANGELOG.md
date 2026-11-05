@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.4.6 (28) — continuous preview highlights and precise Fn shortcuts
+
+- Full-circle window previews animate through the angular seam in either direction without reversing around the ring. The exact seam remains selectable.
+- Track physical Fn modifier transitions separately from navigation-key flags. Repeated modifier-plus-arrow presses and releases no longer invent a Fn press or accidentally open Launcher. Shortcut recording uses the same distinction.
+- Increase the pre-push slow-drift allowance from 48 to 72 points per second. Keep the outside margin, 130 ms settling interval and firm outward stroke requirement.
+- The reported angled-thumb pause was also reproduced by the user with Halo quit, particularly while holding Fn+Control. A different recorded shortcut or Toggle mode is a workaround to try; this update does not claim to fix system trackpad contact filtering.
+
 ## 1.4.5 (27) — compact Switcher previews and slow-drift gestures
 
 - Switcher divides the selected app’s sector among its windows, respecting both edges even in an asymmetric stable layout.

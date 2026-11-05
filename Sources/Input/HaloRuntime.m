@@ -55,7 +55,7 @@ static CGEventRef inputCallback(__unused CGEventTapProxy proxy, CGEventType type
     NSMutableSet *_regularHeld, *_swallowed;
     NSMutableArray *_buffer;
     pid_t _bufferPID;
-    BOOL _passthrough, _mouseCaptured, _presented[3], _settingsKeyDown;
+    BOOL _passthrough, _mouseCaptured, _presented[3], _settingsKeyDown, _fnHeld;
     NSUInteger _pendingTicket, _actionGeneration;
     NSUInteger _showTickets[3], _presentedTickets[3];
     HaloSettingsController *_settings;
@@ -211,7 +211,7 @@ static CGEventRef inputCallback(__unused CGEventTapProxy proxy, CGEventType type
     [_buffer removeAllObjects];
 }
 - (void)resetInput {
-    _settingsKeyDown=NO;
+    _settingsKeyDown=NO; _fnHeld=NO;
     [self cancel]; [self flushBuffer]; [_regularHeld removeAllObjects];
     [_swallowed removeAllObjects]; _passthrough=NO; _mouseCaptured=NO;
     [self.engine update:[NSSet set] at:NSProcessInfo.processInfo.systemUptime];
@@ -250,6 +250,11 @@ static CGEventRef inputCallback(__unused CGEventTapProxy proxy, CGEventType type
     }
     NSInteger code=CGEventGetIntegerValueField(event,kCGKeyboardEventKeycode);
     BOOL down=type==kCGEventKeyDown, up=type==kCGEventKeyUp;
+    // Navigation/F-key events also carry SecondaryFn. Only the physical Fn
+    // flagsChanged event may press it; ordinary key snapshots cannot invent
+    // or release it. Reset/recovery deliberately waits for a fresh Fn press.
+    if (type==kCGEventFlagsChanged && code==63)
+        _fnHeld=(CGEventGetFlags(event)&kCGEventFlagMaskSecondaryFn)!=0;
     NSNumber *key=@(code);
     if (up && code==self.engine.config.settingsKey) _settingsKeyDown=NO;
     // Handle the Settings key against the visible session before interpreting
@@ -275,7 +280,9 @@ static CGEventRef inputCallback(__unused CGEventTapProxy proxy, CGEventType type
     }
     if (down && !HaloIsModifierCode(code)) [_regularHeld addObject:key];
     if (up) [_regularHeld removeObject:key];
-    NSMutableSet *held=[_regularHeld mutableCopy]; [held unionSet:HaloModifierKeys(CGEventGetFlags(event))];
+    CGEventFlags modifiers=CGEventGetFlags(event)&~kCGEventFlagMaskSecondaryFn;
+    if (_fnHeld) modifiers|=kCGEventFlagMaskSecondaryFn;
+    NSMutableSet *held=[_regularHeld mutableCopy]; [held unionSet:HaloModifierKeys(modifiers)];
     if (self.recordInput) {
         [self.engine update:held at:NSProcessInfo.processInfo.systemUptime];
         self.recordInput(held);

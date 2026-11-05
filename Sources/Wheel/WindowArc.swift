@@ -21,6 +21,12 @@ struct WindowArc {
     func center(_ index: Int) -> Double {
         angle + (Double(index) - Double(count - 1) / 2) * width
     }
+    private var isFullCircle: Bool { width * Double(count) >= 2 * .pi - 1e-9 }
+    func highlightAngle(for index: Int, from previous: Double?) -> Double {
+        let target = center(index)
+        guard let previous, isFullCircle else { return target }
+        return previous + WheelGeometry.shortestDelta(from: previous, to: target)
+    }
     // Bounding rectangle in tangent/radial coordinates, including both
     // curved edges. Aspect-fill this rectangle before applying the sector mask.
     var crop: (size: CGSize, radialCenter: Double) {
@@ -31,7 +37,8 @@ struct WindowArc {
     }
     func index(distance: Double, direction: Double) -> Int? {
         guard distance >= inner, count > 0 else { return nil }
-        let offset = WheelGeometry.shortestDelta(from: angle, to: direction) + Double(count) * width / 2
+        var offset = WheelGeometry.shortestDelta(from: angle, to: direction) + Double(count) * width / 2
+        if isFullCircle && offset >= Double(count) * width { offset = 0 }
         guard offset >= 0, offset < Double(count) * width else { return nil }
         return min(count - 1, Int(offset / width))
     }
@@ -66,7 +73,7 @@ struct WindowPull {
     // Follow slow drift without letting it accumulate toward the fast push.
     // The two-point slack still absorbs small tremors around a complete stop.
     private mutating func followsSlowMotion(point: CGPoint, elapsed: Double, travel: Double) -> Bool {
-        let allowance = 48 * elapsed
+        let allowance = 72 * elapsed
         guard travel <= 2 + allowance else { return false }
         if travel > 0 {
             let fraction = min(1, allowance / travel)

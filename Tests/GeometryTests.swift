@@ -32,7 +32,7 @@ import Foundation
         var stalled = WindowPull(point: radial(200), time: 0, wheelRadius: 150)
         _ = stalled.sample(point: radial(270), time: 0.18)
         expect(!stalled.requested, "Missing samples are not evidence of a stop")
-        for speed in [10.0, 200, 700] {
+        for speed in [10.0, 48, 64, 72, 100, 200, 700] {
             var steady = WindowPull(point: radial(90), time: 0, wheelRadius: 150)
             var opened = false
             for tick in 1...2000 {
@@ -44,16 +44,43 @@ import Foundation
         }
         // No stationary samples: glide for longer than the dwell window,
         // then accelerate immediately from the current (moving) anchor.
-        var glide = WindowPull(point: radial(230), time: 0, wheelRadius: 150)
-        for tick in 1...50 {
-            let t = Double(tick)*0.008
-            _ = glide.sample(point: radial(230 + 40*t), time: t)
-            expect(!glide.requested, "Slow drift alone cannot open")
+        for speed in [40.0, 64, 72] {
+            for interval in [1.0/60, 1.0/120, 1.0/240] {
+                var glide = WindowPull(point: radial(230), time: 0, wheelRadius: 150)
+                let ticks = Int(0.4 / interval)
+                let duration = Double(ticks) * interval
+                for tick in 1...ticks {
+                    let t = Double(tick) * interval
+                    _ = glide.sample(point: radial(230 + speed*t), time: t)
+                    expect(!glide.requested, "Slow drift alone cannot open")
+                }
+                for tick in 1...5 {
+                    _ = glide.sample(point: radial(230 + speed*duration + Double(tick)*10), time: duration + Double(tick)*0.015)
+                }
+                expect(glide.requested, "Moving cursor can accelerate outward without a complete stop at different sample rates")
+            }
         }
-        for tick in 1...5 {
-            _ = glide.sample(point: radial(246 + Double(tick)*10), time: 0.40 + Double(tick)*0.015)
+        for origin in [-Double.pi/2, 0, .pi] {
+            let circle = WindowArc(appAngle: origin, count: 16, bounds: (.pi/8, .pi/8), fitsParent: false, geometry: g)
+            expect(circle.index(distance: circle.outer, direction: origin + .pi) == 0 &&
+                   circle.index(distance: circle.outer, direction: origin - .pi) == 0,
+                   "Full ring has no neutral pixel at either representation of the seam")
+            for direction in [-1, 1] {
+                var highlight = circle.highlightAngle(for: 0, from: nil)
+                for step in 1...64 {
+                    let index = (step * direction % circle.count + circle.count) % circle.count
+                    let target = circle.highlightAngle(for: index, from: highlight)
+                    expect(abs(target - highlight - Double(direction)*circle.width) < 1e-9,
+                           "Full preview ring highlight continues through both seams across repeated turns")
+                    expect(circle.index(distance: circle.outer, direction: target) == index,
+                           "Unwrapped highlight stays aligned with the selected preview")
+                    highlight = target
+                }
+            }
         }
-        expect(glide.requested, "Slow moving cursor can accelerate outward without a complete stop")
+        let partial = WindowArc(appAngle: -.pi/2, count: 7, bounds: (.pi/8, .pi/8), fitsParent: false, geometry: g)
+        expect(partial.highlightAngle(for: 6, from: partial.center(0)) == partial.center(6),
+               "An incomplete fan traverses its populated sectors rather than its empty gap")
         for n in [2, 3, 9] {
             let arc = WindowArc(appAngle: .pi, count: n, bounds: (0.20, 0.65), fitsParent: true, geometry: g)
             expect(abs(arc.center(0) - arc.width/2 - (.pi - 0.20)) < 1e-9 &&

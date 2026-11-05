@@ -1,5 +1,12 @@
 # Verification record
 
+## November 4, 2026 — 1.4.6 (28) arc seam and physical Fn tracking
+
+- `make verify` passed on its first run: 19,972 geometry/preference checks, the shortcut and runtime suites, 4,112 native window/lifecycle checks, and 28 disposable app reopen checks. All fixture apps quit. Live thumbnail capture was skipped because the debug executable lacked permission.
+- Focused regressions cover repeated full-circle highlight turns in both directions from three origins, exact-seam hit testing, partial-fan behavior, 40/64/72 pt/s drift followed by a push at 60/120/240 Hz, and steady-motion rejection. Existing inward, sideways, near-rim and missing-sample rejection still passes.
+- Unposted runtime events cover both sides of Shift, Option, Control and Command with four arrows, navigation keys and F1, repeats and both release orders. Tests also retain physical Fn activation, Fn+Control handoff, ordinary events missing Fn flags, recording, reset, and an explicitly configured Option+Right Arrow shortcut. No keyboard or mouse input was injected into user apps.
+- The user reproduced the angled-thumb pause while Halo was quit, especially with Fn+Control held. This is evidence of behavior independent of Halo, not a confirmed diagnosis of its system-level cause. Physical gesture/haptic acceptance remains manual. See POINTER_INPUT.md.
+
 ## November 3, 2026 — 1.4.5 (27) Switcher bounds and slow drift
 
 - Focused geometry checks cover a continuous 40 pt/s glide followed by an outward push, and asymmetric Switcher bounds spanning the angular seam with two, three and nine windows. Existing steady-motion rejection and Launcher layout checks passed.

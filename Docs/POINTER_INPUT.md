@@ -1,4 +1,14 @@
-# Pointer input investigation — 1.3.2
+# Pointer input investigation
+
+## November 4, 2026 — same keys with Halo quit
+
+The user repeated the same angled-thumb contact with Halo fully quit. The pause still occurred, especially with Fn+Control held. Occasionally motion began immediately, then stopped after roughly a centimeter. This establishes that the reported pause can occur independently of Halo. It does not identify the exact macOS contact-classification or hardware cause.
+
+The existing focus-preserving, non-consuming mouse path remains in place. No public per-app trackpad setting in this project bypasses macOS contact recognition. Changing Halo's hover timer or injecting cursor movement would not recover contact data that macOS has not delivered.
+
+When convenient, try a recorded shortcut that does not use Fn in General, or the existing Toggle activation mode so the keys can be released before touching the trackpad. These are workarounds to evaluate, not verified fixes. This release leaves the user's shortcuts, activation modes and system trackpad preferences unchanged.
+
+The separate accidental arrow-key activation has a concrete software cause and fix in 1.4.6. Apple's [function modifier documentation](https://developer.apple.com/documentation/appkit/nsevent/modifierflags-swift.struct/function) includes navigation keys. Halo now tracks physical Fn transitions separately instead of treating that flag on ordinary keys as a held Fn key.
 
 ## Report and evidence
 

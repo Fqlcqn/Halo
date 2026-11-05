@@ -11,6 +11,7 @@ void HaloAddActivationSwitch(void *parent, NSInteger wheel, BOOL enabled, void (
 - (void)menuLauncher:(id)sender;
 - (void)menuQuitter:(id)sender;
 - (CGEventRef)event:(CGEventRef)event type:(CGEventType)type;
+- (void)resetInput;
 @end
 @interface FixtureDriver : NSObject <HaloWheelDriver>
 @property NSMutableArray *events;
@@ -81,6 +82,67 @@ int main(void) {
         [runtime.engine update:c.launcher at:3]; drain();
         NSCAssert([runtime.events containsObject:@"show:1"],@"Recording must resume cleanly");
         [runtime stop];
+        // macOS sets SecondaryFn on navigation/F-key events even when the
+        // physical Fn key is up. Exercise repeats and both release orders.
+        FixtureDriver *navigationDriver=[FixtureDriver new];
+        EventRuntime *navigation=[[EventRuntime alloc] initWithDriver:navigationDriver defaults:defaults];
+        navigation.engine.config=[HaloShortcutConfig defaults]; navigation.engine.config.switcherEnabled=YES;
+        NSArray *modifiers=@[@[@56,@(kCGEventFlagMaskShift|NX_DEVICELSHIFTKEYMASK)],
+                            @[@60,@(kCGEventFlagMaskShift|NX_DEVICERSHIFTKEYMASK)],
+                            @[@58,@(kCGEventFlagMaskAlternate)], @[@61,@(kCGEventFlagMaskAlternate)],
+                            @[@59,@(kCGEventFlagMaskControl)], @[@62,@(kCGEventFlagMaskControl)],
+                            @[@55,@(kCGEventFlagMaskCommand)], @[@54,@(kCGEventFlagMaskCommand)]];
+        for (NSArray *modifier in modifiers) {
+            for (NSNumber *navigationKey in @[@123,@124,@125,@126,@115,@119,@116,@121,@117,@122]) {
+                for (NSInteger releaseFirst=0;releaseFirst<2;releaseFirst++) {
+                    CGKeyCode modifierCode=[modifier[0] unsignedShortValue], code=navigationKey.unsignedShortValue;
+                    CGEventFlags flags=[modifier[1] unsignedLongLongValue];
+                    keyEvent(navigation,kCGEventFlagsChanged,modifierCode,flags);
+                    for (NSInteger repeat=0;repeat<4;repeat++) {
+                        NSCAssert(!keyEvent(navigation,kCGEventKeyDown,code,flags|kCGEventFlagMaskSecondaryFn),@"Navigation remains available to the foreground app");
+                        NSCAssert(!navigation.engine.active && ![navigation.engine.held containsObject:@(HaloFn)],@"Navigation flags cannot invent physical Fn");
+                    }
+                    if (releaseFirst) keyEvent(navigation,kCGEventFlagsChanged,modifierCode,kCGEventFlagMaskSecondaryFn);
+                    NSCAssert(!keyEvent(navigation,kCGEventKeyUp,code,(releaseFirst?0:flags)|kCGEventFlagMaskSecondaryFn),@"Navigation release passes through");
+                    NSCAssert(!navigation.engine.active && ![navigation.engine.held containsObject:@(HaloFn)],@"Releasing arrows cannot open a Fn-only wheel");
+                    keyEvent(navigation,kCGEventFlagsChanged,modifierCode,0);
+                }
+            }
+        }
+        drain();
+        NSCAssert(navigationDriver.events.count==0,@"Modifier/navigation spam never queues a wheel");
+        keyEvent(navigation,kCGEventFlagsChanged,63,kCGEventFlagMaskSecondaryFn);
+        NSCAssert(navigation.engine.active==HaloLauncher,@"Physical Fn still opens Launcher immediately");
+        keyEvent(navigation,kCGEventKeyDown,124,0);
+        keyEvent(navigation,kCGEventKeyUp,124,kCGEventFlagMaskSecondaryFn);
+        NSCAssert(navigation.engine.active==HaloLauncher,@"Ordinary snapshots cannot release a physically held Fn");
+        keyEvent(navigation,kCGEventFlagsChanged,59,kCGEventFlagMaskControl|kCGEventFlagMaskSecondaryFn);
+        NSCAssert(navigation.engine.active==HaloQuitter,@"Physical Fn plus Control still hands off to Quitter");
+        keyEvent(navigation,kCGEventFlagsChanged,63,kCGEventFlagMaskControl);
+        NSCAssert(!navigation.engine.active,@"Physical Fn release closes the held wheel");
+        keyEvent(navigation,kCGEventFlagsChanged,59,0);
+        __block NSSet *recorded;
+        navigation.recordInput=^(NSSet *held) { recorded=held; };
+        keyEvent(navigation,kCGEventKeyDown,124,kCGEventFlagMaskSecondaryFn);
+        NSCAssert([recorded isEqual:HaloKeys(@[@124])],@"Recording an arrow does not also record phantom Fn");
+        keyEvent(navigation,kCGEventKeyUp,124,kCGEventFlagMaskSecondaryFn);
+        keyEvent(navigation,kCGEventFlagsChanged,63,kCGEventFlagMaskSecondaryFn);
+        NSCAssert([recorded isEqual:HaloKeys(@[@(HaloFn)])],@"Recording recognizes physical Fn");
+        navigation.recordInput=nil;
+        [navigation resetInput];
+        keyEvent(navigation,kCGEventKeyDown,124,kCGEventFlagMaskSecondaryFn);
+        keyEvent(navigation,kCGEventKeyUp,124,kCGEventFlagMaskSecondaryFn);
+        NSCAssert(!navigation.engine.active && ![navigation.engine.held containsObject:@(HaloFn)],@"Reset discards stale physical Fn state");
+        HaloShortcutConfig *arrowConfig=[HaloShortcutConfig defaults];
+        arrowConfig.launcher=HaloKeys(@[@(HaloOption),@124]);
+        navigation.engine.config=arrowConfig;
+        keyEvent(navigation,kCGEventFlagsChanged,61,kCGEventFlagMaskAlternate);
+        keyEvent(navigation,kCGEventKeyDown,124,kCGEventFlagMaskAlternate|kCGEventFlagMaskSecondaryFn);
+        NSCAssert(navigation.engine.active==HaloLauncher,@"An explicitly configured Option-arrow shortcut still works");
+        keyEvent(navigation,kCGEventKeyUp,124,kCGEventFlagMaskAlternate|kCGEventFlagMaskSecondaryFn);
+        NSCAssert(!navigation.engine.active,@"Configured arrow release closes the wheel");
+        keyEvent(navigation,kCGEventFlagsChanged,61,0);
+        [navigation stop]; drain();
         // The normal focus-preserving panel relies on this tap route for
         // click confirmation. These events are never posted to the system.
         for (HaloWheel wheel=HaloLauncher;wheel<=HaloSwitcher;wheel++) {
