@@ -6,20 +6,40 @@ import Foundation
         func expect(_ condition: Bool, _ message: String) { precondition(condition, message); checks += 1 }
         let g = WheelGeometry()
         func radial(_ radius: Double) -> CGPoint { CGPoint(x: radius, y: 0) }
-        func afterStop(at radius: Double) -> WindowPull {
-            var pull = WindowPull(point: radial(radius), time: 0, wheelRadius: 150)
+        func afterStop(at radius: Double, innerRadius: Double = g.innerDiameter / 2) -> WindowPull {
+            var pull = WindowPull(point: radial(radius), time: 0, innerRadius: innerRadius)
             for tick in 1...20 {
                 _ = pull.sample(point: radial(radius), time: Double(tick) * 0.008)
             }
             return pull
         }
-        for start in [125.0, 160, 190, 1600] {
+        for start in [40.0, 83, 84, 100, 125, 160, 190, 1600] {
             var pull = afterStop(at: start)
             for step in 1...4 {
                 _ = pull.sample(point: radial(start + Double(step) * 12), time: 0.16 + Double(step)*0.012)
             }
-            expect(pull.requested == (start >= 174), "Only an outside stop plus a fast outward stroke qualifies")
+            expect(pull.requested == (start >= g.innerDiameter / 2), "A settled outward stroke qualifies starting at the visible inner edge")
         }
+        for diameter in [240.0, 300, 520] {
+            for thickness in [36.0, 66, 78] {
+                let geometry = WheelGeometry(diameter: diameter, thickness: thickness)
+                let inner = geometry.innerDiameter / 2
+                for start in [inner - 1, inner, inner + 10] {
+                    var pull = afterStop(at: start, innerRadius: inner)
+                    for step in 1...4 {
+                        _ = pull.sample(point: radial(start + Double(step)*12), time: 0.16 + Double(step)*0.012)
+                    }
+                    expect(pull.requested == (start >= inner), "Arming follows the actual inner edge for every wheel size and thickness")
+                }
+            }
+        }
+        var briefPause = WindowPull(point: radial(100), time: 0, innerRadius: g.innerDiameter / 2)
+        for tick in 1...10 { _ = briefPause.sample(point: radial(100), time: Double(tick)*0.008) }
+        _ = briefPause.sample(point: radial(150), time: 0.09)
+        expect(!briefPause.requested, "Brief hesitation on the ring is not a settled gesture")
+        var nudge = afterStop(at: 100)
+        for tick in 1...5 { _ = nudge.sample(point: radial(100 + Double(tick)*6), time: 0.16 + Double(tick)*0.015) }
+        expect(!nudge.requested, "Small outward nudges on the ring do not open the arc")
         for direction in [-1.0, 0] {
             var wrongWay = afterStop(at: 300)
             for step in 1...5 {
@@ -29,11 +49,11 @@ import Foundation
             }
             expect(!wrongWay.requested, "Backward and sideways strokes cannot open an arc")
         }
-        var stalled = WindowPull(point: radial(200), time: 0, wheelRadius: 150)
+        var stalled = WindowPull(point: radial(200), time: 0, innerRadius: g.innerDiameter / 2)
         _ = stalled.sample(point: radial(270), time: 0.18)
         expect(!stalled.requested, "Missing samples are not evidence of a stop")
-        for speed in [10.0, 48, 64, 72, 100, 200, 700] {
-            var steady = WindowPull(point: radial(90), time: 0, wheelRadius: 150)
+        for speed in [10.0, 48, 64, 72, 78, 90, 100, 200, 700] {
+            var steady = WindowPull(point: radial(90), time: 0, innerRadius: g.innerDiameter / 2)
             var opened = false
             for tick in 1...2000 {
                 let time = Double(tick) * 0.008
@@ -44,9 +64,9 @@ import Foundation
         }
         // No stationary samples: glide for longer than the dwell window,
         // then accelerate immediately from the current (moving) anchor.
-        for speed in [40.0, 64, 72] {
+        for speed in [40.0, 72, 76, 78] {
             for interval in [1.0/60, 1.0/120, 1.0/240] {
-                var glide = WindowPull(point: radial(230), time: 0, wheelRadius: 150)
+                var glide = WindowPull(point: radial(230), time: 0, innerRadius: g.innerDiameter / 2)
                 let ticks = Int(0.4 / interval)
                 let duration = Double(ticks) * interval
                 for tick in 1...ticks {

@@ -1,5 +1,12 @@
 # Verification record
 
+## November 5, 2026 — 1.4.7 (29) inner-edge pull tracking
+
+- `make verify` passed on its first run: 20,178 geometry/preference checks, shortcut/runtime suites, 4,123 native window/lifecycle checks and 28 disposable app reopen checks. All fixture apps quit. Live thumbnail capture was skipped because the debug executable lacked permission.
+- Focused geometry cases cover starts just inside, exactly on and beyond the inner edge at three diameters and three thicknesses. They retain rejection of steady motion, inward/sideways pushes, missing samples, brief hesitations and small nudges. Slow-glide checks include the slightly higher 76/78 pt/s allowance at 60/120/240 Hz.
+- Production-controller fixtures open from the default inner edge with maximum dead zone and finite reach, from the ring, and from far away. A thick compact wheel starts tracking inside its ordinary selection dead zone and preserves the pull while crossing it. Neutral releases stay neutral. Opening inside the outer rim remains stable on the way out to the previews, and an inward crossing still collapses the arc.
+- No user input was injected, no user-app windows were acted on, and physical trackpad gesture/haptic feel remains manual acceptance.
+
 ## November 4, 2026 — 1.4.6 (28) arc seam and physical Fn tracking
 
 - `make verify` passed on its first run: 19,972 geometry/preference checks, the shortcut and runtime suites, 4,112 native window/lifecycle checks, and 28 disposable app reopen checks. All fixture apps quit. Live thumbnail capture was skipped because the debug executable lacked permission.

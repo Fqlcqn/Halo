@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.4.7 (29) — inner-edge window gestures
+
+- Start the window pull at the wheel’s visible inner edge, including within the ring, using the current diameter and thickness. Ordinary app-selection dead zones and finite release reach remain intact.
+- Slightly raise the slow-drift allowance from 72 to 78 points per second. Keep the 130 ms settling interval, firm 44-point outward stroke within 100 ms, and direction/reversal checks.
+- Update the Window picker instructions to describe starting on the ring. An arc opened inside the outer rim remains open while moving outward to its previews; crossing back inside the outer rim still collapses it.
+
 ## 1.4.6 (28) — continuous preview highlights and precise Fn shortcuts
 
 - Full-circle window previews animate through the angular seam in either direction without reversing around the ring. The exact seam remains selectable.

@@ -2,6 +2,12 @@
 
 Reference: Halo 0.2.1 (6), copied from the former hybrid project's `Latest/Halo.app` at reconstruction time. That historical project is now Halo Legacy; its baseline is preserved separately. Current Halo is entirely source-built. Historical provenance and baseline hashes are in `VERIFICATION.md`. The complete original Swift source was **not** recovered; this is a reconstruction from public API behavior, executable inspection, and visual evidence.
 
+## Inner-edge pulls (1.4.7)
+
+The arming boundary is now `geometry.innerDiameter / 2`, with no extra outer-rim margin. This follows each wheel’s diameter and thickness. Direction tracking inside the ring is independent of the ordinary app-selection dead zone, so a neutral release stays neutral and crossing that dead zone for the same app preserves the pending gesture. The central hole cannot arm a pull.
+
+Slow drift follows up to 78 points per second (previously 72). The existing two-point jitter allowance, 130 ms settling interval, 44-point outward stroke within 100 ms, 80% radial progress and reversal rejection remain. Continuous motion and brief hesitations still do not qualify. Opening inside the outer rim does not itself count as an inward crossing; dismissal still requires crossing from outside the outer rim to inside it.
+
 ## Input corrections (1.4.6)
 
 A complete window ring accumulates shortest angular steps for its selection highlight, including repeated turns across the first/last preview seam. An incomplete fan keeps its existing bounded path. The full-ring seam itself belongs to the first preview rather than becoming neutral.

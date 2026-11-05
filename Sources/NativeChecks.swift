@@ -145,11 +145,7 @@ import SwiftUI
         responsive.updateSelection()
         try? await Task.sleep(for: .milliseconds(200))
         expect(responsive.state.selected == 0 && responsive.state.arc == nil, "Ordinary hover keeps app selection")
-        pointer.y += 52
-        responsive.updateSelection()
-        expect(responsive.state.arc == nil, "A firm stroke starting on the wheel cannot open the picker")
-        try? await Task.sleep(for: .milliseconds(200))
-        // A separate outward stroke after settling beyond the rim opens.
+        // A separate outward stroke can now start on the visible ring.
         for _ in 0..<4 {
             pointer.y += 13
             responsive.updateSelection()
@@ -202,7 +198,7 @@ import SwiftUI
         responsive.updateSelection()
         expect(responsive.state.arc == nil && responsive.state.selected == nil, "Retreat cancels picker and center release")
         responsive.hide(immediately: true)
-        for stoppingRadius in [185.0, 940.0] {
+        for stoppingRadius in [84.0, 123.0, 185.0, 940.0] {
             pointer = center
             let reach = 100.0
             responsive.show(items: [target] + Array(items.prefix(7)),
@@ -211,9 +207,18 @@ import SwiftUI
             pointer.y += stoppingRadius
             responsive.updateSelection()
             try? await Task.sleep(for: .milliseconds(200))
+            if stoppingRadius < 86 {
+                expect(responsive.state.selected == nil && responsive.takeSelection() == nil,
+                       "Inner-edge tracking preserves neutral release inside the ordinary dead zone")
+            }
             pointer.y += 50
             responsive.updateSelection()
-            expect(responsive.state.arc?.count == 2, "A second push crosses finite reach or starts far beyond the rim")
+            expect(responsive.state.arc?.count == 2, "A second push can start at the inner edge, cross finite reach or start far outside")
+            if stoppingRadius + 50 < 150 {
+                pointer.y += 2
+                responsive.updateSelection()
+                expect(responsive.state.arc != nil, "An arc opened inside the rim stays open while moving toward its previews")
+            }
             pointer.y = center.y + 1100
             responsive.updateSelection()
             pointer.y = center.y + 185
@@ -227,6 +232,20 @@ import SwiftUI
             expect(responsive.state.arc == nil, "Crossing inside the launcher rim collapses the arc")
             responsive.hide(immediately: true)
         }
+        pointer = center
+        let compact = WheelGeometry(diameter: 240, selectionDistance: 86, thickness: 78)
+        responsive.show(items: [target], geometry: compact, center: center, instant: true, requiresKeyboardFocus: false)
+        pointer.y += compact.innerDiameter / 2
+        responsive.updateSelection()
+        try? await Task.sleep(for: .milliseconds(200))
+        expect(responsive.state.selected == nil, "Thick compact wheel can track at its inner edge while ordinary selection stays neutral")
+        for _ in 0..<4 {
+            pointer.y += 12
+            responsive.updateSelection()
+            try? await Task.sleep(for: .milliseconds(7))
+        }
+        expect(responsive.state.arc?.count == 2, "A compact wheel retains the same pull while crossing its app-selection dead zone")
+        responsive.hide(immediately: true)
         responsive.loadPreviews = { _ in [pair[0]] }
         pointer = center
         responsive.show(items: [target], geometry: WheelGeometry(), center: center, instant: true, requiresKeyboardFocus: false)

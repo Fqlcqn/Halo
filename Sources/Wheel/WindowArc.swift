@@ -56,8 +56,8 @@ struct WindowPull {
     private var peak: Double = 0
     var requested: Bool { if case .triggered = phase { return true }; return false }
 
-    init(point: CGPoint, time: Double, wheelRadius: Double) {
-        minimumRadius = wheelRadius + 24
+    init(point: CGPoint, time: Double, innerRadius: Double) {
+        minimumRadius = innerRadius
         anchor = point
         since = time
         lastSample = time
@@ -73,7 +73,7 @@ struct WindowPull {
     // Follow slow drift without letting it accumulate toward the fast push.
     // The two-point slack still absorbs small tremors around a complete stop.
     private mutating func followsSlowMotion(point: CGPoint, elapsed: Double, travel: Double) -> Bool {
-        let allowance = 72 * elapsed
+        let allowance = 78 * elapsed
         guard travel <= 2 + allowance else { return false }
         if travel > 0 {
             let fraction = min(1, allowance / travel)

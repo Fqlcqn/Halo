@@ -188,11 +188,22 @@ final class WheelPanel: NSPanel {
             let scale = (limit + state.geometry.selectionDistance) / (2 * distance)
             index = state.selectedIndex(dx: dx * scale, dy: dy * scale)
         }
+        // The visible inner edge can lie inside the ordinary launch dead zone.
+        // Track the app direction there without making a neutral release launch
+        // an app. Crossing the dead zone for that same app must retain the pull.
+        var pullIndex: Int?
+        if windowPickerEnabled, distance >= state.geometry.innerDiameter / 2 {
+            let reference = (state.geometry.selectionDistance + (state.geometry.maximumSelectionDistance ?? state.geometry.diameter / 2)) / 2
+            pullIndex = state.selectedIndex(dx: dx * reference / distance, dy: dy * reference / distance)
+        }
         let lift = state.geometry.iconLift(distance: distance, dynamic: dynamicIconMovement)
         if abs(state.motion.lift - lift) > 0.001 { state.motion.lift = lift }
-        select(index, pointerAngle: direction)
-        if windowPickerEnabled, let index, state.items.indices.contains(index) {
-            trackPull(item: state.items[index], point: radialPoint)
+        let sameOwner = previewOwner != nil && pullIndex.map { state.items[$0].id == previewOwner } == true
+        select(index, pointerAngle: direction, preservingPicker: sameOwner)
+        if let pullIndex {
+            trackPull(item: state.items[pullIndex], point: radialPoint)
+        } else if previewOwner != nil {
+            resetPicker()
         }
     }
 
@@ -229,7 +240,7 @@ final class WheelPanel: NSPanel {
             default: app = nil
             }
             guard let app else { return }
-            pull = WindowPull(point: point, time: now, wheelRadius: state.geometry.diameter / 2)
+            pull = WindowPull(point: point, time: now, innerRadius: state.geometry.innerDiameter / 2)
             let load = loadPreviews
             previewTask = Task { [weak self] in
                 // Moving through a sector need not start screen capture.
@@ -270,9 +281,9 @@ final class WheelPanel: NSPanel {
         state.previewIndex = state.arc?.index(distance: distance, direction: atan2(panel.frame.midY - lastMouse.y, lastMouse.x - panel.frame.midX))
     }
 
-    func select(_ index: Int?, pointerAngle: Double? = nil) {
+    func select(_ index: Int?, pointerAngle: Double? = nil, preservingPicker: Bool = false) {
         guard index != state.selected else { return }
-        if previewOwner != nil { resetPicker() }
+        if previewOwner != nil && !preservingPicker { resetPicker() }
         if let index, state.items.indices.contains(index) {
             let target = state.angle(for: index)
             state.selectionHasOrigin = state.selected != nil
