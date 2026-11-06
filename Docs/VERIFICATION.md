@@ -1,5 +1,12 @@
 # Verification record
 
+## November 6, 2026 — 1.4.8 (30) phantom preview filtering
+
+- `make verify` passed on its first run: 20,178 geometry/preference checks, shortcut/runtime suites, 4,138 native window/lifecycle checks and 28 disposable app reopen checks. All fixture apps quit. Live thumbnail capture was skipped because the debug executable lacked permission.
+- Focused native checks cover auxiliary/non-window/non-raiseable eligibility, valid custom windows, transparent captures versus legitimate solid black/white content, fresh AX/window-server membership and duplicate identities. A four-candidate snapshot becomes three when its extra window disappears from either source.
+- A delayed capture fixture reopens the same app, completes the newer request first, then returns four entries from the canceled older request. The active arc retains only its current two previews. Reopening again creates an independent presentation identity.
+- Read-only Opera window-server inspection showed additional offscreen layer-zero surfaces, but the inspecting process lacked AX permission. The exact intermittent fourth-sector report was not reproduced live. No user-app windows were raised/closed, no real keyboard/mouse events were posted, and no destructive actions were tested.
+
 ## November 5, 2026 — 1.4.7 (29) inner-edge pull tracking
 
 - `make verify` passed on its first run: 20,178 geometry/preference checks, shortcut/runtime suites, 4,123 native window/lifecycle checks and 28 disposable app reopen checks. All fixture apps quit. Live thumbnail capture was skipped because the debug executable lacked permission.

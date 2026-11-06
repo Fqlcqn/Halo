@@ -26,6 +26,7 @@ struct WheelItem: Identifiable {
     let motion = IconMotion()
     @Published var previews: [WindowPreview] = []
     @Published var previewIndex: Int?
+    var previewSession = UUID()
     var fitsWindowArcToAppSector = false
     var arc: WindowArc? {
         guard let selected, !previews.isEmpty else { return nil }
@@ -230,7 +231,7 @@ struct WheelView: View {
                 .animation(reduceMotion || !state.selectionHasOrigin ? nil : .spring(response: 0.14, dampingFraction: 0.98, blendDuration: 0.04), value: state.selectionAngle)
                 .animation(reduceMotion ? nil : .easeOut(duration: 0.10), value: state.selected != nil)
             if let arc = state.arc { WindowArcView(previews: state.previews, previewIndex: state.previewIndex, finish: state.glassFinish,
-                                                        amount: state.glassAmount, tint: state.selectionTint, arc: arc) }
+                                                        amount: state.glassAmount, tint: state.selectionTint, arc: arc).id(state.previewSession) }
             if showsIcons { WheelIcons(state: state, motion: state.motion, activate: activate) }
         }
         .frame(width: geometry.diameter + 28, height: geometry.diameter + 28)

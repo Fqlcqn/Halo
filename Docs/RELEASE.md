@@ -1,6 +1,6 @@
 # GitHub release checklist
 
-Current version: **1.4.7 (29)**. Distribution is direct download, not the App Store.
+Current version: **1.4.8 (30)**. Distribution is direct download, not the App Store.
 The app is universal, hardened-runtime enabled, non-sandboxed, and ad-hoc signed.
 It is not Developer ID signed, notarized, or independently security audited.
 
@@ -21,8 +21,8 @@ It is not Developer ID signed, notarized, or independently security audited.
 5. Create the official repository and enable private vulnerability reporting.
    Put a private contact method on the owner's profile before announcing it.
    Commit only tracked source/docs, never local Reference/Backups/Deployments.
-6. Commit/push the 1.4.7 changes, then create tag/release v1.4.7 at that commit and attach Dist/Halo-1.4.7-macOS.zip,
-   Dist/Halo-1.4.7-source.zip, and Dist/SHA256SUMS. Include the signing limitation,
+6. Commit/push the 1.4.8 changes, then create tag/release v1.4.8 at that commit and attach Dist/Halo-1.4.8-macOS.zip,
+   Dist/Halo-1.4.8-source.zip, and Dist/SHA256SUMS. Include the signing limitation,
    macOS 26 requirement, force-quit/Trash warning, and changes in release notes.
    This workspace does not create a repository or publish automatically.
 

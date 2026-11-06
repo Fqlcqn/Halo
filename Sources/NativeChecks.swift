@@ -136,6 +136,32 @@ import SwiftUI
         let app = NSRunningApplication.current
         let pair = (1...2).map { WindowPreview(id: CGWindowID($0), image: snapshot,
                                                element: AXUIElementCreateApplication(app.processIdentifier), app: app) }
+        expect(WindowPreview.isUserWindow(role: kAXWindowRole, subrole: kAXStandardWindowSubrole, hasControls: false, canRaise: true),
+               "Ordinary windows remain selectable without relying on title or image content")
+        expect(!WindowPreview.isUserWindow(role: kAXWindowRole, subrole: kAXUnknownSubrole, hasControls: false, canRaise: true),
+               "Auxiliary surfaces without user-window semantics are omitted")
+        expect(!WindowPreview.isUserWindow(role: kAXWindowRole, subrole: kAXStandardWindowSubrole, hasControls: true, canRaise: false),
+               "A window without the required focus action never becomes a dead sector")
+        expect(WindowPreview.isUserWindow(role: kAXWindowRole, subrole: kAXUnknownSubrole, hasControls: true, canRaise: true),
+               "Custom windows with standard controls remain supported")
+        expect(!WindowPreview.isUserWindow(role: kAXGroupRole, subrole: kAXStandardWindowSubrole, hasControls: true, canRaise: true),
+               "Non-window accessibility elements are rejected")
+        let transparent = CGContext(data: nil, width: 16, height: 16, bitsPerComponent: 8, bytesPerRow: 64,
+                                    space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)!
+        expect(!WindowPreview.hasVisiblePixels(transparent.makeImage()!), "Empty transparent captures are omitted")
+        for gray in [0.0, 1.0] {
+            transparent.setFillColor(gray: gray, alpha: 1)
+            transparent.fill(CGRect(x: 0, y: 0, width: 16, height: 16))
+            expect(WindowPreview.hasVisiblePixels(transparent.makeImage()!), "Real solid black or white window content is retained")
+        }
+        let candidates = (1...4).map { WindowPreview(id: CGWindowID($0), image: snapshot,
+                                                     element: AXUIElementCreateApplication(pid_t($0)), app: app) }
+        expect(WindowPreview.retainingLiveWindows(candidates, ids: [1, 2, 3], elements: candidates.map(\.element)).map(\.id) == [1, 2, 3],
+               "A fourth surface removed during capture leaves exactly three sectors")
+        expect(WindowPreview.retainingLiveWindows(candidates, ids: [1, 2, 3, 4], elements: candidates.prefix(3).map(\.element)).map(\.id) == [1, 2, 3],
+               "A stale AX window is removed even if its capture surface remains")
+        expect(WindowPreview.retainingLiveWindows(candidates + [candidates[0]], ids: [1, 2, 3, 4], elements: candidates.map(\.element)).count == 4,
+               "Repeated window identities cannot create duplicate sectors")
         responsive.windowPickerEnabled = true
         responsive.loadPreviews = { _ in pair }
         let target = WheelItem(id: "preview-fixture", name: "Fixture", icon: nil, action: .activate(app))
@@ -256,6 +282,41 @@ import SwiftUI
         responsive.updateSelection()
         expect(responsive.state.arc == nil && responsive.takeSelection()?.id == target.id,
                "A single window always takes the ordinary launcher path")
+        responsive.hide(immediately: true)
+        // Simulate a capture API finishing after cancellation, then reopening
+        // the same app. No capture permission or user-window action is needed.
+        var pending: [CheckedContinuation<[WindowPreview], Never>] = []
+        responsive.loadPreviews = { _ in await withCheckedContinuation { pending.append($0) } }
+        for _ in 0..<2 {
+            pointer = center
+            responsive.show(items: [target], geometry: WheelGeometry(), center: center, instant: true, requiresKeyboardFocus: false)
+            pointer.y += 123
+            responsive.updateSelection()
+            try? await Task.sleep(for: .milliseconds(80))
+            if pending.count == 1 { responsive.hide(immediately: true) }
+        }
+        expect(pending.count == 2, "Both rapid same-app requests reach the delayed capture fixture")
+        pending[1].resume(returning: pair)
+        try? await Task.sleep(for: .milliseconds(160))
+        pointer.y += 52
+        responsive.updateSelection()
+        expect(responsive.state.arc?.count == 2, "The latest capture supplies the reopened arc")
+        let currentSession = responsive.state.previewSession
+        pending[0].resume(returning: candidates)
+        await settle()
+        expect(responsive.state.arc?.count == 2 && responsive.state.previews.map(\.id) == pair.map(\.id),
+               "Late canceled four-window capture cannot add phantom sectors to the current two-window arc")
+        responsive.hide(immediately: true)
+        responsive.loadPreviews = { _ in pair }
+        pointer = center
+        responsive.show(items: [target], geometry: WheelGeometry(), center: center, instant: true, requiresKeyboardFocus: false)
+        pointer.y += 123
+        responsive.updateSelection()
+        try? await Task.sleep(for: .milliseconds(200))
+        pointer.y += 52
+        responsive.updateSelection()
+        expect(responsive.state.arc?.count == 2 && responsive.state.previewSession != currentSession,
+               "Every new arc receives an independent rendering identity")
         responsive.hide(immediately: true)
         focus.close()
         for _ in 0..<100 {

@@ -11,7 +11,7 @@ shortcuts, animation, and haptics.
 
 ## Install
 
-Requires **macOS 26+**, Apple silicon or Intel. Download `Halo-1.4.7-macOS.zip`
+Requires **macOS 26+**, Apple silicon or Intel. Download `Halo-1.4.8-macOS.zip`
 from this repository's Releases, unzip, move Halo.app to Applications, and open
 it. Quit older Halo copies first. There is no account, subscription, telemetry,
 or automatic updater.

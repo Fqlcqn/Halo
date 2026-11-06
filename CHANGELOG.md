@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.4.8 (30) — reject phantom window previews
+
+- Only offer accessible user windows that support the focus action. Omit auxiliary surfaces without normal window semantics, fully transparent captures and zero-opacity window-server surfaces.
+- Recheck window-server IDs and live Accessibility windows after asynchronous capture. Closed/stale entries and duplicate identities cannot become preview sectors. Real white or black window contents remain valid, and offscreen status alone does not exclude minimized or other-Space windows.
+- Give each capture request and arc presentation its own identity so rapid reopening of the same app cannot reuse a prior arc or accept a late canceled capture.
+
 ## 1.4.7 (29) — inner-edge window gestures
 
 - Start the window pull at the wheel’s visible inner edge, including within the ring, using the current diameter and thickness. Ordinary app-selection dead zones and finite release reach remain intact.

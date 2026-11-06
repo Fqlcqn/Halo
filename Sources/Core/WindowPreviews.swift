@@ -41,14 +41,67 @@ struct WindowPreview: Identifiable, @unchecked Sendable {
         return CGRect(origin: point, size: size)
     }
 
+    static func isUserWindow(role: String?, subrole: String?, hasControls: Bool, canRaise: Bool) -> Bool {
+        guard role == kAXWindowRole, canRaise else { return false }
+        return [kAXStandardWindowSubrole, kAXDialogSubrole, kAXFloatingWindowSubrole].contains(subrole ?? "") || hasControls
+    }
+
+    private static func isSelectable(_ element: AXUIElement) -> Bool {
+        var actions: CFArray?
+        let canRaise = AXUIElementCopyActionNames(element, &actions) == .success &&
+            (actions as? [String])?.contains(kAXRaiseAction) == true
+        let subrole = attribute(element, kAXSubroleAttribute) as? String
+        let hasControls = [kAXCloseButtonAttribute, kAXMinimizeButtonAttribute, kAXZoomButtonAttribute]
+            .contains { attribute(element, $0) != nil }
+        return isUserWindow(role: attribute(element, kAXRoleAttribute) as? String,
+                            subrole: subrole, hasControls: hasControls, canRaise: canRaise)
+    }
+
+    private static func liveWindowIDs(processID: pid_t) -> Set<CGWindowID> {
+        let rows = CGWindowListCopyWindowInfo(.optionAll, kCGNullWindowID) as? [[String: Any]] ?? []
+        return Set(rows.compactMap { row in
+            guard (row[kCGWindowOwnerPID as String] as? NSNumber)?.int32Value == processID,
+                  (row[kCGWindowLayer as String] as? NSNumber)?.intValue == 0,
+                  (row[kCGWindowAlpha as String] as? NSNumber)?.doubleValue ?? 0 > 0,
+                  let id = row[kCGWindowNumber as String] as? NSNumber else { return nil }
+            return id.uint32Value
+        })
+    }
+
+    // Reject absent capture content, not legitimately blank/white/black windows.
+    static func hasVisiblePixels(_ image: CGImage) -> Bool {
+        var pixels = [UInt8](repeating: 0, count: 32 * 32 * 4)
+        return pixels.withUnsafeMutableBytes { bytes in
+            guard let context = CGContext(data: bytes.baseAddress, width: 32, height: 32,
+                                          bitsPerComponent: 8, bytesPerRow: 128,
+                                          space: CGColorSpaceCreateDeviceRGB(),
+                                          bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue | CGBitmapInfo.byteOrder32Big.rawValue) else { return false }
+            context.draw(image, in: CGRect(x: 0, y: 0, width: 32, height: 32))
+            return stride(from: 3, to: bytes.count, by: 4).contains { bytes[$0] > 0 }
+        }
+    }
+
+    static func retainingLiveWindows(_ previews: [Self], ids: Set<CGWindowID>, elements: [AXUIElement]) -> [Self] {
+        var seenIDs: Set<CGWindowID> = []
+        var seenElements: [AXUIElement] = []
+        return previews.filter { preview in
+            guard ids.contains(preview.id), elements.contains(where: { CFEqual($0, preview.element) }),
+                  !seenIDs.contains(preview.id), !seenElements.contains(where: { CFEqual($0, preview.element) }) else { return false }
+            seenIDs.insert(preview.id); seenElements.append(preview.element)
+            return true
+        }
+    }
+
     static func load(app: NSRunningApplication) async -> [Self] {
         guard !app.isTerminated, AXIsProcessTrusted(), CGPreflightScreenCaptureAccess(),
               let content = try? await SCShareableContent.excludingDesktopWindows(true, onScreenWindowsOnly: false),
               !Task.isCancelled else { return [] }
         let process = AXUIElementCreateApplication(app.processIdentifier)
         AXUIElementSetMessagingTimeout(process, 0.15)
-        guard let windows = attribute(process, kAXWindowsAttribute) as? [AXUIElement] else { return [] }
-        let eligible = content.windows.filter { $0.owningApplication?.processID == app.processIdentifier && $0.windowLayer == 0 && !$0.frame.isEmpty }
+        guard let listed = attribute(process, kAXWindowsAttribute) as? [AXUIElement] else { return [] }
+        let windows = listed.filter { isSelectable($0) }
+        let liveIDs = liveWindowIDs(processID: app.processIdentifier)
+        let eligible = content.windows.filter { $0.owningApplication?.processID == app.processIdentifier && $0.windowLayer == 0 && !$0.frame.isEmpty && liveIDs.contains($0.windowID) }
         // SC and AX have no shared public window-ID accessor. Accept only
         // one-to-one matches, even for identical browser titles or stacked windows.
         let records = windows.map { (element: $0, frame: bounds($0), title: attribute($0, kAXTitleAttribute) as? String) }
@@ -84,10 +137,18 @@ struct WindowPreview: Identifiable, @unchecked Sendable {
             config.showsCursor = false
             config.ignoreShadowsSingleWindow = true
             let filter = SCContentFilter(desktopIndependentWindow: window)
-            if let image = try? await SCScreenshotManager.captureImage(contentFilter: filter, configuration: config) {
+            if let image = try? await SCScreenshotManager.captureImage(contentFilter: filter, configuration: config),
+               hasVisiblePixels(image) {
                 previews.append(Self(id: window.windowID, image: image, element: element, app: app))
             }
         }
-        return previews
+        // Capturing is asynchronous: a transient surface or closed window may
+        // disappear while other thumbnails are being produced. Check both
+        // public identities again before exposing any sectors to the user.
+        guard !Task.isCancelled, !app.isTerminated,
+              let current = attribute(process, kAXWindowsAttribute) as? [AXUIElement] else { return [] }
+        let validated = retainingLiveWindows(previews, ids: liveWindowIDs(processID: app.processIdentifier),
+                                             elements: current.filter { isSelectable($0) })
+        return validated.count >= 2 ? validated : []
     }
 }

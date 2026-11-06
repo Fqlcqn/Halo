@@ -2,6 +2,12 @@
 
 Reference: Halo 0.2.1 (6), copied from the former hybrid project's `Latest/Halo.app` at reconstruction time. That historical project is now Halo Legacy; its baseline is preserved separately. Current Halo is entirely source-built. Historical provenance and baseline hashes are in `VERIFICATION.md`. The complete original Swift source was **not** recovered; this is a reconstruction from public API behavior, executable inspection, and visual evidence.
 
+## Window preview validity (1.4.8)
+
+Capture candidates must have the AX window role, advertise AXRaise, and have a standard/dialog/floating subrole or a standard window control. Matching still uses unambiguous title/frame relationships between public AX and ScreenCaptureKit objects. Window-server owner, layer and opacity are checked without requiring onscreen visibility. Fully transparent images are omitted; uniform white/black content and untitled real windows remain valid.
+
+After capture, candidates are intersected with fresh window-server IDs and selectable AX elements. IDs and AX elements are deduplicated. Fewer than two valid results retain the ordinary app-selection path. Cancellation plus a unique request token guards every load completion, and a new SwiftUI identity separates each arc presentation. These checks do not guarantee that a user cannot close a window after an arc is already displayed.
+
 ## Inner-edge pulls (1.4.7)
 
 The arming boundary is now `geometry.innerDiameter / 2`, with no extra outer-rim margin. This follows each wheel’s diameter and thickness. Direction tracking inside the ring is independent of the ordinary app-selection dead zone, so a neutral release stays neutral and crossing that dead zone for the same app preserves the pending gesture. The central hole cannot arm a pull.

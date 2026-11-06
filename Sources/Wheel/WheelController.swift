@@ -33,6 +33,7 @@ final class WheelPanel: NSPanel {
     var loadPreviews: (NSRunningApplication) async -> [WindowPreview] = { await WindowPreview.load(app: $0) }
     private var preparedPreviews: [WindowPreview] = []
     private var previewOwner: String?
+    private var previewRequest = UUID()
     private var lastMouse: CGPoint?
     var onAccessibilitySelect: ((Int) -> Void)?
     var onKeyEvent: ((NSEvent) -> Bool)?
@@ -208,6 +209,7 @@ final class WheelPanel: NSPanel {
     }
 
     private func resetPicker() {
+        previewRequest = UUID()
         previewTask?.cancel()
         previewTask = nil
         previewOwner = nil
@@ -242,12 +244,13 @@ final class WheelPanel: NSPanel {
             guard let app else { return }
             pull = WindowPull(point: point, time: now, innerRadius: state.geometry.innerDiameter / 2)
             let load = loadPreviews
+            let request = previewRequest
             previewTask = Task { [weak self] in
                 // Moving through a sector need not start screen capture.
                 try? await Task.sleep(for: .milliseconds(35))
                 guard !Task.isCancelled else { return }
                 let previews = await load(app)
-                guard !Task.isCancelled, let self, self.previewOwner == item.id else { return }
+                guard !Task.isCancelled, let self, self.previewRequest == request, self.previewOwner == item.id else { return }
                 self.preparedPreviews = previews
                 if previews.count < 2 { self.pull = nil; self.state.motion.stretch = 0 }
                 self.openArcIfReady()
@@ -269,6 +272,7 @@ final class WheelPanel: NSPanel {
         let distance = hypot(lastMouse.x - panel.frame.midX, lastMouse.y - panel.frame.midY)
         previousPreviewRadius = distance
         resizePanel(expanded: true)
+        state.previewSession = UUID()
         withAnimation(state.instantTransitions ? nil : .easeOut(duration: 0.19)) {
             state.previews = preparedPreviews
             // Keep tension at the root while the fan opens. This also gives
